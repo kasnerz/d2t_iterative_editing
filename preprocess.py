@@ -12,22 +12,21 @@ logger = logging.getLogger(__name__)
 
 
 class Preprocessor:
-    def __init__(self, dataset, mode, delexicalize=False, ss_device="cuda", reduce_mode="gmean"):
+    def __init__(self, dataset, mode, device="cuda"):
         self.dataset = dataset
         self.mode = mode
         self.tokenizer = Tokenizer()
 
         if self.mode != "full":
-            self.sentence_scorer = SentenceScorer(device=ss_device, reduce_mode=reduce_mode)
+            self.sentence_scorer = SentenceScorer(device=device, reduce_mode="gmean")
 
     def extract_incremental(self, splits, output_path):
         """
         Extracts incremental examples from the dataset as training data
         for the sentence fusion model.
         """
-        logger.info(f"Extracting incremental examples (mode={self.mode}).")
-
         for split in splits:
+            logger.info(f"Processing {split} split")
             entry_list = self.dataset.data[split]
             lengths, idxs = self.dataset.sort_by_lengths(entry_list)
             entries_out = []
@@ -40,7 +39,7 @@ class Preprocessor:
 
                 if n > prev_n:
                     # next size
-                    logger.info(f"Processing {n}-tuples")
+                    logger.info(f"Parsing {n}-tuples")
                     beg = idxs[idxs_pos] if idxs_pos < len(idxs) else None
                     end = idxs[idxs_pos+1] if idxs_pos+1 < len(idxs) else None
                     prev_n = n
@@ -53,7 +52,7 @@ class Preprocessor:
                 # extract all incremental examples for the current entry
                 entries_out += self._extract(entry_list, entry, n, lengths, beg, end)
 
-            self._write(output_path, split, entries_out)
+            self.write(output_path, split, entries_out)
 
 
     def _extract(self, entry_list, entry, n, lengths, beg, end):
@@ -90,41 +89,60 @@ class Preprocessor:
 
 
     def _is_incremental(self, triples, triples_p1):
-        """Checks if `triples_p1` (length n+1) contains all the triples from `triples` (length n)"""
+        """
+        Checks if `triples_p1` (length n+1) contains all the triples from `triples` (length n)
+        """
         return all(x in triples_p1 for x in triples)
 
 
-    def _write(self, out_dir, split, entryset_out):
+    def write(self, out_dir, split, entryset_out):
+        """
+        Writes training data for the sentence fusion model
+        """
         out_path = os.path.join(out_dir, self.mode)
         os.makedirs(out_path, exist_ok=True)
 
         f_in = open(os.path.join(out_path, f"{split}.in"), "w")
         f_ref = open(os.path.join(out_path, f"{split}.ref"), "w")
 
+        entries_processed = 0
         samples_processed = 0
+        log_step = 10
+        log_next_percentage = log_step
+        n = len(entryset_out)
 
         for entry in entryset_out:
-            pairs = self._get_lex_pair(entry)
+            entries_processed += 1
+
+            if self.dataset.is_d2t:
+                pairs = self._get_lex_pairs(entry)
+            else:
+                pairs = [entry]
 
             for inp, ref in pairs:
                 f_in.write(inp + "\n")
                 f_ref.write(ref + "\n")
-
                 samples_processed += 1
-                if samples_processed % 1000 == 0:
-                    logger.info(f"{samples_processed} samples processed")
 
-        logger.info(f"{samples_processed} samples extracted.")
+            if int(100*entries_processed / n) == log_next_percentage:
+                logger.info(f"{entries_processed} entries processed, {samples_processed} samples extracted")
+                log_next_percentage += log_step
 
 
     def _fill_template(self, template, triple):
+        """
+        Fills a template with the data from the triple
+        """
         template = template.replace("<subject>", triple.subj) \
                             .replace("<predicate>", triple.pred) \
                             .replace("<object>", triple.obj)
         return template
 
 
-    def _get_lex_pair(self, entry):
+    def _get_lex_pairs(self, entry):
+        """
+        Extract lexicalization pairs based on the selected mode
+        """
         inp_sents = []
 
         assert len(entry["data"]) == 1
@@ -176,8 +194,6 @@ if __name__ == '__main__':
         help="Path to the dataset")
     parser.add_argument("--mode", type=str, required=True,
         help="Preprocess mode ('best', 'best_tgt', 'full')")
-    parser.add_argument("--templates", type=str, required=False,
-        help="Path to a JSON file with templates for the dataset")
     parser.add_argument("--output_path", type=str, required=True,
         help="Path where to store the incremental examples")
     parser.add_argument("--device", type=str, default="cuda",
@@ -188,20 +204,20 @@ if __name__ == '__main__':
 
     # Load dataset class
     try:
-        dataset_mod = __import__("datasets.dataset", fromlist=[args.dataset])
+        dataset_mod = __import__("datasets", fromlist=[args.dataset])
         dataset_cls = getattr(dataset_mod, args.dataset)
         dataset = dataset_cls()
     except AttributeError:
-        logger.error(f"Unknown dataset: '{args.dataset}'. Please create class '{args.dataset}' in 'datasets/dataset.py'.")
+        logger.error(f"Unknown dataset: '{args.dataset}'. Please create a class '{args.dataset}' in 'datasets.py'.")
         exit()
 
     # Load data
     logger.info(f"Loading dataset {args.dataset}")
     try:
         dataset.load_from_dir(path=args.input, splits=args.splits)
-    except FileNotFoundError:
+    except FileNotFoundError as err:
         logger.error(f"Dataset not found in {args.input}")
-        exit()
+        raise err
 
     # Create output directory
     try:
@@ -211,23 +227,17 @@ if __name__ == '__main__':
         logger.error(f"Output directory {out_dirname} can not be created")
         exit()
 
-    # Load or extract templates
-    if args.templates:
-        dataset.load_templates(args.templates)
-        logger.info(f"Loaded templates from {args.templates}")
+    if dataset.is_d2t:
+        # Load or extract templates
+        dataset.load_templates(out_dirname)
+
+        # Extract incremental examples
+        preprocessor = Preprocessor(dataset=dataset, mode=args.mode, device=args.device)
+        logger.info(f"Processing the {args.dataset} dataset (mode={args.mode})")
+        preprocessor.extract_incremental(splits=args.splits, output_path=out_dirname)
+
     else:
-        templates_filename = os.path.join(out_dirname, "templates.json")
-
-        if os.path.isfile(templates_filename):
-            dataset.load_templates(templates_filename)
-            logger.info(f"Loaded existing templates from {templates_filename}")
-        else:
-            logger.info("JSON file with templates not specified, templates will be extracted from the training data")
-            dataset.extract_templates(templates_filename)
-
-
-    # Extract incremental examples
-    logger.info(f"Extracting incremental examples for the dataset {args.dataset}")
-
-    preprocessor = Preprocessor(dataset=dataset, mode=args.mode)
-    preprocessor.extract_incremental(splits=args.splits, output_path=out_dirname)
+        # DiscoFuse: dataset can be sent directly to output
+        for split in args.splits:
+            preprocessor = Preprocessor(dataset=dataset, mode=args.mode, device=args.device)
+            preprocessor.write(out_dirname, split, dataset.data[split])

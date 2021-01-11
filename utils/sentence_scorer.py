@@ -1,11 +1,20 @@
 #!/usr/bin/env python
 
+import logging
+
 from lm_scorer.models.auto import AutoLMScorer as LMScorer
 from pprint import pprint as pp
 from utils.tokenizer import Tokenizer
 
+logger = logging.getLogger(__name__)
+
+
 class SentenceScorer:
     def __init__(self, reduce_mode="gmean", device="cuda"):
+
+        if device == "cpu":
+            logger.warning("Running LMScorer on CPU. Scoring may be slow.")
+
         self.model = LMScorer.from_pretrained("gpt2", device=device, batch_size=1)
         self.reduce_mode = reduce_mode
         self.tokenizer = Tokenizer()
