@@ -22,8 +22,7 @@ class Preprocessor:
 
     def extract_incremental(self, splits, output_path):
         """
-        Extracts incremental examples from the dataset as training data
-        for the sentence fusion model.
+        Extracts incremental examples from the D2T dataset.
         """
         for split in splits:
             logger.info(f"Processing {split} split")
@@ -52,7 +51,7 @@ class Preprocessor:
                 # extract all incremental examples for the current entry
                 entries_out += self._extract(entry_list, entry, n, lengths, beg, end)
 
-            self.write(output_path, split, entries_out)
+            self.process(output_path, split, entries_out)
 
 
     def _extract(self, entry_list, entry, n, lengths, beg, end):
@@ -95,9 +94,9 @@ class Preprocessor:
         return all(x in triples_p1 for x in triples)
 
 
-    def write(self, out_dir, split, entryset_out):
+    def process(self, out_dir, split, entryset_out):
         """
-        Writes training data for the sentence fusion model
+        Processes and outputs training data for the sentence fusion model
         """
         out_path = os.path.join(out_dir, self.mode)
         os.makedirs(out_path, exist_ok=True)
@@ -141,7 +140,7 @@ class Preprocessor:
 
     def _get_lex_pairs(self, entry):
         """
-        Extract lexicalization pairs based on the selected mode
+        Combines lexicalizations based on the selected mode
         """
         inp_sents = []
 
@@ -227,6 +226,7 @@ if __name__ == '__main__':
         logger.error(f"Output directory {out_dirname} can not be created")
         exit()
 
+    # WebNLG / E2E / ...
     if dataset.is_d2t:
         # Load or extract templates
         dataset.load_templates(out_dirname)
@@ -236,8 +236,8 @@ if __name__ == '__main__':
         logger.info(f"Processing the {args.dataset} dataset (mode={args.mode})")
         preprocessor.extract_incremental(splits=args.splits, output_path=out_dirname)
 
+    # DiscoFuse: dataset can be sent directly to output
     else:
-        # DiscoFuse: dataset can be sent directly to output
         for split in args.splits:
             preprocessor = Preprocessor(dataset=dataset, mode=args.mode, device=args.device)
             preprocessor.write(out_dirname, split, dataset.data[split])
