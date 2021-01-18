@@ -5,6 +5,8 @@ import csv
 import os
 import logging
 
+from utils import e2e_checker
+
 from collections import defaultdict, namedtuple
 from utils import webnlg_parsing
 
@@ -34,6 +36,50 @@ class Dataset:
         """Parses the original dataset files into an internal representation"""
         raise NotImplementedError
 
+    # TODO remove
+    # def load(self, path, splits):
+    #     """Loads the processed data for decoding"""
+    #     for split in splits:
+    #         in_filename = os.path.join(path, split + ".in")
+    #         ref_filename = os.path.join(path, split + ".ref")
+
+    #         lines_loaded = 0
+
+    #         if os.path.isfile(in_filename) and os.path.isfile(ref_filename):
+    #             logger.info(f"Loading {split} data from {path}")
+    #             with open(in_filename) as in_file, open(ref_filename) as ref_file:
+    #                 for src, tgt in zip(in_file, ref_file):
+    #                     self.data[split].append((src, tgt))
+    #                     lines_loaded += 1
+
+    #             logger.info(f"{lines_loaded} lines loaded")
+    #         else:
+    #             logger.error(f"Dataset not found at {path}")
+    #             raise IOError
+
+
+    def check_facts(self, sent, triples):
+        """Checks if the sentence supports all the triples"""
+
+        def normalize(s):
+            # remove all chars except alnum, space and dot
+            return re.sub("[^0-9a-zA-Z ]+", "", s)
+
+        for triple in triples:
+            subj = self.tokenizer.tokenize(triple.subj).lower()
+            subj = _normalize(subj)
+
+            obj = self.tokenizer.tokenize(triple.obj).lower()
+            obj = _normalize(obj)
+
+            sent = sent.lower()
+            sent = _normalize(sent)
+
+            if subj not in sent or obj not in sent:
+                return False
+
+        return True
+
     def extract_templates(self, output_file):
         """Extract templates from the training data split"""
         raise NotImplementedError
@@ -45,7 +91,7 @@ class Dataset:
         if os.path.isfile(templates_filename):
             logger.info(f"Loaded existing templates from {templates_filename}")
             with open(templates_filename) as f:
-                self.templates_double = json.load(f)
+                self.templates = json.load(f)
         else:
             logger.info("Templates will be extracted from the training data")
             self.extract_templates(output_dir)
@@ -127,7 +173,7 @@ class WebNLG(Dataset):
         return templates
 
 
-    def load_from_dir(self, data_dir, splits):
+    def load_from_dir(self, path, splits):
         for split in splits:
             logger.info(f"Loading {split} split")
             data_dir = os.path.join(path, split)
@@ -153,8 +199,8 @@ class WebNLG(Dataset):
     def get_templates(self, triple):
         pred = triple.pred
 
-        if pred in self.templates_double:
-            templates = self.templates_double[pred]
+        if pred in self.templates:
+            templates = self.templates[pred]
         else:
             templates = self.fallback_templates
 
@@ -179,6 +225,7 @@ class WebNLG(Dataset):
             lexs.append(lex)
 
         return lexs
+
 
 
 
@@ -409,6 +456,9 @@ class E2E(Dataset):
 
         return templates
 
+
+    def check_facts(self, sent, triples):
+        return e2e_checker.check_facts(sent, triples)
 
 
 class DiscoFuse(Dataset):

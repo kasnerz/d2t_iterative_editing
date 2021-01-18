@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from lasertagger_tf import LaserTaggerTF
+from model_tf import LaserTaggerTF
 
 import logging
 import argparse
@@ -28,7 +28,7 @@ if __name__ == '__main__':
         help="Maximum number of training examples to preprocess")
     parser.add_argument("--num_train_steps", type=int, default=10000,
         help="Number of training steps (set e.g. to 100 for testing)")
-    parser.add_argument("--bert_base_dir", type=str, default="lasertagger/bert/cased_L-12_H-768_A-12",
+    parser.add_argument("--bert_base_dir", type=str, default="lasertagger_tf/bert/cased_L-12_H-768_A-12",
         help="Base directory with the BERT pretrained model")
     parser.add_argument("--train_only", action="store_true",
         help="Skip phrase vocabulary optimization, converting text to tags and exporting the model")

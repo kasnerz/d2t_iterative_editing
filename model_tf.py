@@ -10,13 +10,13 @@ import shutil
 from collections import defaultdict
 from model import FuseModel
 
-from lasertagger import bert_example
-from lasertagger import predict_utils
-from lasertagger import tagging_converter
-from lasertagger import utils
-from lasertagger import phrase_vocabulary_optimization
-from lasertagger import preprocess_main
-from lasertagger import run_lasertagger
+from lasertagger_tf import bert_example
+from lasertagger_tf import predict_utils
+from lasertagger_tf import tagging_converter
+from lasertagger_tf import utils
+from lasertagger_tf import phrase_vocabulary_optimization
+from lasertagger_tf import preprocess_main
+from lasertagger_tf import run_lasertagger
 
 
 logger = logging.getLogger(__name__)
@@ -71,10 +71,6 @@ class LaserTaggerTF(FuseModel):
                 exp_output_dir=exp_output_dir,
                 experiment_name=train_args.experiment_name
             )
-        else:
-            logger.info("Skipping phrase vocabulary optimization...")
-
-        if not (train_args.train_only or train_args.export_only):
             self._convert_text_to_tags(
                   dataset_dir=dataset_dir,
                   exp_output_dir=exp_output_dir,
@@ -82,7 +78,7 @@ class LaserTaggerTF(FuseModel):
                   max_input_examples=train_args.max_input_examples
             )
         else:
-            logger.info("Skipping converting text to tags...")
+            logger.info("Skipping phrase vocabulary optimization and converting text to tags...")
 
         self._train(
             exp_output_dir=exp_output_dir,
@@ -166,7 +162,7 @@ class LaserTaggerTF(FuseModel):
 
         flags.training_file = os.path.join(exp_output_dir, "train.tf_record")
         flags.label_map_file = os.path.join(exp_output_dir, "label_map.txt")
-        flags.model_config_file = os.path.join("lasertagger", "configs", "lasertagger_config.json")
+        flags.model_config_file = os.path.join("lasertagger_tf", "configs", "lasertagger_config.json")
         flags.output_dir = os.path.join(exp_output_dir, "models")
         flags.do_train = True
         flags.do_eval = False
@@ -216,7 +212,6 @@ class LaserTaggerTF(FuseModel):
 
             flags.init_checkpoint = os.path.join(flags.output_dir, export_checkpoint)
             run_lasertagger.main(flags)
-
 
             # exported model directory gets timestamped - move the file to the parent directory for consistency
             all_subdirs = [os.path.join(flags.export_path, d) for d in os.listdir(flags.export_path)]
