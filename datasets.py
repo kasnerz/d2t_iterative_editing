@@ -276,7 +276,7 @@ class E2E(Dataset):
             del keys[name_idx]
             del vals[name_idx]
 
-            # yet another corrupted case hotfix
+            # corrupted case hotfix
             if not keys:
                 keys.append("eatType")
                 vals.append("restaurant")
