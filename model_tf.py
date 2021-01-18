@@ -13,7 +13,7 @@ from model import FuseModel
 from lasertagger_tf import bert_example
 from lasertagger_tf import predict_utils
 from lasertagger_tf import tagging_converter
-from lasertagger_tf import utils
+from lasertagger_tf import utils as lt_utils
 from lasertagger_tf import phrase_vocabulary_optimization
 from lasertagger_tf import preprocess_main
 from lasertagger_tf import run_lasertagger
@@ -39,6 +39,23 @@ class LaserTaggerTF(FuseModel):
     """
     def __init__(self):
         super().__init__()
+
+
+    def predict(self, label_map_file, vocab_file, model_path, is_uncased, max_seq_length):
+        """
+        Initialize the model for prediction
+        """
+        label_map = lt_utils.read_label_map(label_map_file)
+        converter = tagging_converter.TaggingConverter(
+          tagging_converter.get_phrase_vocabulary_from_label_map(label_map),
+          False) # enable_swap_tag
+
+        builder = bert_example.BertExampleBuilder(label_map, vocab_file,
+                                                max_seq_length,
+                                                is_uncased, converter)
+        self.predictor = predict_utils.LaserTaggerPredictor(
+          tf.contrib.predictor.from_saved_model(model_path), builder,
+          label_map)
 
 
     def fuse(self, first, second):
@@ -89,28 +106,6 @@ class LaserTaggerTF(FuseModel):
             train_only=train_args.train_only,
             export_only=train_args.export_only
         )
-
-
-    def predict(self):
-        hyperparams = f"b{args.batch_size}l{args.learning_rate}"
-
-        self.label_map_file = os.path.join(args.exp_dir, args.experiment, args.vocab_size, "label_map.txt")
-        self.vocab_file = os.path.join(args.bert_dir, "vocab.txt")
-        self.model_path = os.path.join(args.exp_dir, args.experiment, args.vocab_size, hyperparams, "models", "export", args.model)
-
-        self.label_map = utils.read_label_map(self.label_map_file)
-
-        self.converter = tagging_converter.TaggingConverter(
-          tagging_converter.get_phrase_vocabulary_from_label_map(self.label_map),
-          args.enable_swap_tag)
-
-        self.builder = bert_example.BertExampleBuilder(self.label_map, self.vocab_file,
-                                                args.max_seq_length,
-                                                args.is_uncased, self.converter)
-
-        self.predictor = predict_utils.LaserTaggerPredictor(
-          tf.contrib.predictor.from_saved_model(self.model_path), self.builder,
-          self.label_map)
 
 
     def _phrase_vocabulary_optimization(self, dataset_dir, vocab_size, max_input_examples, exp_output_dir, experiment_name):

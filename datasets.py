@@ -4,6 +4,7 @@ import json
 import csv
 import os
 import logging
+import re
 
 from utils import e2e_checker
 
@@ -58,7 +59,7 @@ class Dataset:
     #             raise IOError
 
 
-    def check_facts(self, sent, triples):
+    def check_facts(self, sent, triples, tokenizer):
         """Checks if the sentence supports all the triples"""
 
         def normalize(s):
@@ -66,14 +67,14 @@ class Dataset:
             return re.sub("[^0-9a-zA-Z ]+", "", s)
 
         for triple in triples:
-            subj = self.tokenizer.tokenize(triple.subj).lower()
-            subj = _normalize(subj)
+            subj = tokenizer.tokenize(triple.subj).lower()
+            subj = normalize(subj)
 
-            obj = self.tokenizer.tokenize(triple.obj).lower()
-            obj = _normalize(obj)
+            obj = tokenizer.tokenize(triple.obj).lower()
+            obj = normalize(obj)
 
             sent = sent.lower()
-            sent = _normalize(sent)
+            sent = normalize(sent)
 
             if subj not in sent or obj not in sent:
                 return False

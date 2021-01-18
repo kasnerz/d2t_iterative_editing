@@ -78,7 +78,7 @@ class IncrementalDecoder:
         beam_ok = []
 
         for sent in beam:
-            if dataset.check_facts(sent, triples):
+            if dataset.check_facts(sent, triples, self.tokenizer):
                 beam_ok.append(sent)
 
         return beam_ok
@@ -131,6 +131,9 @@ class IncrementalDecoder:
 
     def decode(self, dataset, split):
         for i, entry in enumerate(dataset.data[split]):
+            #TODO debug
+            if len(entry.triples) == 1:
+                continue
             self._decode_entry(dataset, entry)
 
 
@@ -146,8 +149,6 @@ if __name__ == "__main__":
         help="Experiment name.")
     parser.add_argument('--splits', type=str, nargs='+', default=["dev"],
         help='Splits to load and decode (e.g. dev test)')
-    parser.add_argument("--enable_swap_tag", default=False, action='store_true',
-        help="Enable SWAP tag used to switch the 1st and 2nd sentence.")
     parser.add_argument("--bert_base_dir", type=str, default="lasertagger_tf/bert/cased_L-12_H-768_A-12",
         help="Base directory with the BERT pretrained model")
     parser.add_argument("--max_seq_length", default=128, type=int,
@@ -201,6 +202,15 @@ if __name__ == "__main__":
             export_file_handle = None
 
         fuse_model = LaserTaggerTF()
+
+        label_map_file = os.path.join(args.exp_dir, args.experiment, args.vocab_size, "label_map.txt")
+        vocab_file = os.path.join(args.bert_base_dir, "vocab.txt")
+        model_path = os.path.join(args.exp_dir, args.experiment, args.vocab_size, "models", "export")
+
+        fuse_model.predict(label_map_file=label_map_file, vocab_file=vocab_file, model_path=model_path,
+                            is_uncased=args.is_uncased, max_seq_length=args.max_seq_length)
+
+
         decoder = IncrementalDecoder(fuse_model, ss_device=args.ss_device,
             reduce_mode=args.reduce_mode,
             export_file_handle=export_file_handle,
