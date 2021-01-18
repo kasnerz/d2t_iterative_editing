@@ -25,13 +25,15 @@ if __name__ == '__main__':
     parser.add_argument("--experiment_name", type=str, default=None,
         help="Experiment name (created from the dataset_name and mode if not specified)")
     parser.add_argument("--max_input_examples", type=int, default=1000000,
-        help="Limit for the number of training examples")
+        help="Maximum number of training examples to preprocess")
+    parser.add_argument("--num_train_steps", type=int, default=10000,
+        help="Number of training steps (set e.g. to 100 for testing)")
     parser.add_argument("--bert_base_dir", type=str, default="lasertagger/bert/cased_L-12_H-768_A-12",
         help="Base directory with the BERT pretrained model")
-    parser.add_argument("--skip_phrase_vocab_opt", action="store_true",
-        help="Skip phrase vocabulary optimization (use if the vocabulary is already optimized)")
-    parser.add_argument("--skip_convert_text_to_tags", action="store_true",
-        help="Skip converting text to tags (use if the text is already converted)")
+    parser.add_argument("--train_only", action="store_true",
+        help="Skip phrase vocabulary optimization, converting text to tags and exporting the model")
+    parser.add_argument("--export_only", action="store_true",
+        help="Skip phrase vocabulary optimization, converting text to tags and training the model")
     args = parser.parse_args()
 
     logger.info("Initializing LaserTagger")
@@ -40,15 +42,4 @@ if __name__ == '__main__':
     if args.experiment_name is None:
         args.experiment_name = f"{args.dataset_name}_{args.mode}"
 
-    # train_args = {
-    #     "dataset_name" : args.dataset_name,
-    #     "mode" : args.mode,
-    #     "vocab_size" : args.vocab_size,
-    #     "max_input_examples" : args.max_input_examples,
-    #     "output_dir" : args.output_dir,
-    #     "experiment_name" : args.experiment_name,
-    #     "bert_base_dir" : args.bert_base_dir,
-    #     "skip_phrase_vocab_opt" : args.skip_phrase_vocab_opt,
-    #     "skip_convert_text_to_tags" : args.skip_convert_text_to_tags
-    # }
     model.train(args)

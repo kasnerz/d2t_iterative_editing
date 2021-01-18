@@ -4,6 +4,8 @@ import tensorflow as tf
 import numpy as np
 import os
 import logging
+import re
+import shutil
 
 from collections import defaultdict
 from model import FuseModel
@@ -61,7 +63,7 @@ class LaserTaggerTF(FuseModel):
         )
         os.makedirs(exp_output_dir, exist_ok=True)
 
-        if not train_args.skip_phrase_vocab_opt:
+        if not (train_args.train_only or train_args.export_only) :
             self._phrase_vocabulary_optimization(
                 dataset_dir=dataset_dir,
                 vocab_size=train_args.vocab_size,
@@ -72,7 +74,7 @@ class LaserTaggerTF(FuseModel):
         else:
             logger.info("Skipping phrase vocabulary optimization...")
 
-        if not train_args.skip_convert_text_to_tags:
+        if not (train_args.train_only or train_args.export_only):
             self._convert_text_to_tags(
                   dataset_dir=dataset_dir,
                   exp_output_dir=exp_output_dir,
@@ -86,7 +88,10 @@ class LaserTaggerTF(FuseModel):
             exp_output_dir=exp_output_dir,
             bert_base_dir=train_args.bert_base_dir,
             learning_rate=train_args.learning_rate,
-            batch_size=train_args.batch_size
+            batch_size=train_args.batch_size,
+            num_train_steps=train_args.num_train_steps,
+            train_only=train_args.train_only,
+            export_only=train_args.export_only
         )
 
 
@@ -128,7 +133,7 @@ class LaserTaggerTF(FuseModel):
         logger.info("Phrase vocabulary optimization finished.")
 
     def _convert_text_to_tags(self, dataset_dir, exp_output_dir, bert_base_dir, max_input_examples):
-        # preprocess dev set
+        # ---- preprocess dev set ----
         flags = FLAGS()
 
         flags.input_file = os.path.join(dataset_dir, "dev")
@@ -148,14 +153,15 @@ class LaserTaggerTF(FuseModel):
         preprocess_main.main(flags)
 
 
-        # preprocess train set (reuse flags)
+        # ---- preprocess train set (reuse the flags) ----
         flags.input_file = os.path.join(dataset_dir, "train")
         flags.output_tfrecord = os.path.join(exp_output_dir, "train.tf_record")
         flags.output_arbitrary_targets_for_infeasible_examples = False
         preprocess_main.main(flags)
 
 
-    def _train(self, exp_output_dir, bert_base_dir, learning_rate, batch_size):
+    def _train(self, exp_output_dir, bert_base_dir, learning_rate, batch_size, num_train_steps, train_only, export_only):
+        # ---- run training ----
         flags = FLAGS()
 
         flags.training_file = os.path.join(exp_output_dir, "train.tf_record")
@@ -177,7 +183,7 @@ class LaserTaggerTF(FuseModel):
         flags.eval_batch_size = 8
         # Proportion of training to perform linear learning rate warmup for.
         flags.warmup_proportion = 0.1
-        flags.num_train_steps = 10000
+        flags.num_train_steps = num_train_steps
 
         # copy default (unused) settings for TPUs
         flags.use_tpu = False
@@ -194,4 +200,33 @@ class LaserTaggerTF(FuseModel):
         with open(os.path.join(exp_output_dir, "dev.tf_record.num_examples.txt"), "r") as f:
             flags.num_eval_examples = int(f.read().strip())
 
-        run_lasertagger.main(flags)
+        if not export_only:
+            run_lasertagger.main(flags)
+
+
+        if not train_only:
+            # ---- export the model (reuse the flags) ----
+            flags.do_train = False
+            flags.do_export = True
+            flags.export_path = os.path.join(flags.output_dir, "export")
+
+            with open(os.path.join(flags.output_dir, "checkpoint"), "r") as f:
+                t = f.read()
+                export_checkpoint = re.findall(r"model_checkpoint_path: \"([^\s]*)\"", t)[0]
+
+            flags.init_checkpoint = os.path.join(flags.output_dir, export_checkpoint)
+            run_lasertagger.main(flags)
+
+
+            # exported model directory gets timestamped - move the file to the parent directory for consistency
+            all_subdirs = [os.path.join(flags.export_path, d) for d in os.listdir(flags.export_path)]
+
+            if len(all_subdirs) > 1:
+                latest_subdir = max(all_subdirs, key=os.path.getmtime)
+                logger.info(f"Selecting the latest exported checkpoint: {latest_subdir}")
+            else:
+                latest_subdir = all_subdirs[0]
+
+            shutil.move(os.path.join(latest_subdir, "saved_model.pb"), flags.export_path)
+            shutil.move(os.path.join(latest_subdir, "variables"), flags.export_path)
+            os.rmdir(latest_subdir)
