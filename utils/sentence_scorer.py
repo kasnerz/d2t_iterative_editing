@@ -11,7 +11,6 @@ logger = logging.getLogger(__name__)
 
 class SentenceScorer:
     def __init__(self, reduce_mode="gmean", device="cuda"):
-
         if device == "cpu":
             logger.warning("Running LMScorer on CPU. Scoring may be slow.")
 

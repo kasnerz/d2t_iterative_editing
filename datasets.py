@@ -33,30 +33,10 @@ class Dataset:
         # incremental examples will be extracted
         self.is_d2t = True
 
+
     def load_from_dir(self, path, splits):
         """Parses the original dataset files into an internal representation"""
         raise NotImplementedError
-
-    # TODO remove
-    # def load(self, path, splits):
-    #     """Loads the processed data for decoding"""
-    #     for split in splits:
-    #         in_filename = os.path.join(path, split + ".in")
-    #         ref_filename = os.path.join(path, split + ".ref")
-
-    #         lines_loaded = 0
-
-    #         if os.path.isfile(in_filename) and os.path.isfile(ref_filename):
-    #             logger.info(f"Loading {split} data from {path}")
-    #             with open(in_filename) as in_file, open(ref_filename) as ref_file:
-    #                 for src, tgt in zip(in_file, ref_file):
-    #                     self.data[split].append((src, tgt))
-    #                     lines_loaded += 1
-
-    #             logger.info(f"{lines_loaded} lines loaded")
-    #         else:
-    #             logger.error(f"Dataset not found at {path}")
-    #             raise IOError
 
 
     def check_facts(self, sent, triples, tokenizer):
@@ -81,9 +61,11 @@ class Dataset:
 
         return True
 
+
     def extract_templates(self, output_file):
         """Extract templates from the training data split"""
         raise NotImplementedError
+
 
     def load_templates(self, output_dir):
         """Loads existing templates from a JSON file"""
@@ -97,9 +79,11 @@ class Dataset:
             logger.info("Templates will be extracted from the training data")
             self.extract_templates(output_dir)
 
+
     def get_templates(self, triple):
         """Returns a set of templates for a given triple"""
         raise NotImplementedError
+
 
     def sort_by_lengths(self, datalist):
         datalist.sort(key=lambda entry: len(entry.triples))
@@ -197,6 +181,7 @@ class WebNLG(Dataset):
             if err > 0:
                 logger.warning(f"Skipping {err} entries without lexicalizations...")
 
+
     def get_templates(self, triple):
         pred = triple.pred
 
@@ -226,7 +211,6 @@ class WebNLG(Dataset):
             lexs.append(lex)
 
         return lexs
-
 
 
 

@@ -17,9 +17,9 @@ logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=lo
 logger = logging.getLogger(__name__)
 
 class IncrementalDecoder:
-    def __init__(self, fuse_model, ss_device, reduce_mode, export_file_handle=None, use_e2e_double_templates=True):
+    def __init__(self, fuse_model, lms_device, reduce_mode, export_file_handle=None, use_e2e_double_templates=True):
         self.fuse_model = fuse_model
-        self.sentence_scorer = SentenceScorer(device=ss_device, reduce_mode=reduce_mode)
+        self.sentence_scorer = SentenceScorer(device=lms_device, reduce_mode=reduce_mode)
         self.export_file_handle = export_file_handle
         self.tokenizer = Tokenizer()
         self.use_e2e_double_templates = use_e2e_double_templates
@@ -155,7 +155,7 @@ if __name__ == "__main__":
         help="Maximum sequence length.")
     parser.add_argument("--is_uncased", default=False, action='store_true',
         help="Whether to lower case the input text.")
-    parser.add_argument("--ss_device", default="cuda", type=str, required=True,
+    parser.add_argument("--lms_device", default="cpu", type=str, required=True,
         help="Device for the sentence scorer ('cpu' / 'cuda').")
     parser.add_argument("--vocab_size", type=str, required=True,
         help="Phrase vocabulary size.")
@@ -211,7 +211,7 @@ if __name__ == "__main__":
                             is_uncased=args.is_uncased, max_seq_length=args.max_seq_length)
 
 
-        decoder = IncrementalDecoder(fuse_model, ss_device=args.ss_device,
+        decoder = IncrementalDecoder(fuse_model, lms_device=args.lms_device,
             reduce_mode=args.reduce_mode,
             export_file_handle=export_file_handle,
             use_e2e_double_templates=args.use_e2e_double_templates)
