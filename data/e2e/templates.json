@@ -1,0 +1,81 @@
+{
+    "area": [
+        "<subject> is located in the <object> .",
+        "<subject> is located at the <object> .",
+        "<subject> is located on the <object> .",
+        "<subject> is located by the <object> .",
+        "<subject> is situated in the <object> .",
+        "<subject> is situated at the <object> .",
+        "<subject> is situated on the <object> .",
+        "<subject> is situated by the <object> .",
+        "<subject> can be found in the <object> .",
+        "<subject> can be found at the <object> .",
+        "<subject> can be found on the <object> .",
+        "<subject> can be found by the <object> .",
+        "<subject> is in the <object> .",
+        "<subject> is at the <object> .",
+        "<subject> is on the <object> .",
+        "<subject> is by the <object> ."
+    ],
+    "customer rating": [
+        "<subject> has <object> customer rating .",
+        "<subject> has a <object> customer rating .",
+        "<subject> has <object> customer rating .",
+        "<subject> has a rating <object> .",
+        "<subject> has rating <object> .",
+        "<subject> has a <object> rating .",
+        "<subject> has <object> rating .",
+        "<subject> is rated <object> .",
+        "<subject> is <object>-rated ."
+    ],
+    "eatType": [
+        "<subject> is a <object> ."
+    ],
+    "familyFriendly": {
+        "yes" : [
+            "<subject> is family-friendly .",
+            "<subject> is kid-friendly .",
+            "<subject> is children-friendly .",
+            "<subject> is family friendly .",
+            "<subject> is kid friendly .",
+            "<subject> is children friendly .",
+            "<subject> is suitable for families .",
+            "<subject> is suitable for children .",
+            "<subject> is suitable for kids ."
+        ],
+        "no" : [
+            "<subject> is not family-friendly .",
+            "<subject> is not kid-friendly .",
+            "<subject> is not children-friendly .",
+            "<subject> is not family friendly .",
+            "<subject> is not kid friendly .",
+            "<subject> is not children friendly .",
+            "<subject> is not suitable for families .",
+            "<subject> is not suitable for children .",
+            "<subject> is not suitable for kids ."
+        ]
+        },
+    "food": [
+        "<subject> serves <object> .",
+        "<subject> provides <object> .",
+        "<subject> serves <object> food .",
+        "<subject> provides <object> food ."
+    ],
+    "near": [
+        "<subject> is located near <object> .",
+        "<subject> is near <object> .",
+        "<subject> is close to <object> .",
+        "<object> is close to <subject> ."
+    ],
+    "priceRange": [
+        "<subject> is in the <object> price range .",
+        "<subject> serves food in the <object> price range .",
+        "<subject> serves food in the price range <object> .",
+        "<subject> serves food at <object> prices .",
+        "<subject> serves food at prices <object> .",
+        "Prices at <subject> are <object> .",
+        "You pay <subject> at <object> .",
+        "The average price at <subject> is <object> .",
+        "<subject> is <object> ."
+    ]
+}
