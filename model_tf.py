@@ -63,19 +63,16 @@ class LaserTaggerTF(FuseModel):
         return self.predictor.predict([sentence])
 
 
-    def train(self, train_args):
+    def train(self, train_args, dataset_dir):
         """
         The training pipeline for LT:
         1. phrase vocabulary optimization (extracting phrases used as a vocabulary)
         2. converting text to tags (model is trained directly on KEEP, ADD and DELETE tags)
         3. training
         """
-        dataset_dir = os.path.join("data",
-                                   train_args.dataset_name,
-                                   train_args.mode)
 
         exp_output_dir = os.path.join(train_args.output_dir,
-            train_args.experiment_name,
+            train_args.experiment,
             str(train_args.vocab_size)
         )
         os.makedirs(exp_output_dir, exist_ok=True)
@@ -86,7 +83,7 @@ class LaserTaggerTF(FuseModel):
                 vocab_size=train_args.vocab_size,
                 max_input_examples=train_args.max_input_examples,
                 exp_output_dir=exp_output_dir,
-                experiment_name=train_args.experiment_name
+                experiment_name=train_args.experiment
             )
             self._convert_text_to_tags(
                   dataset_dir=dataset_dir,

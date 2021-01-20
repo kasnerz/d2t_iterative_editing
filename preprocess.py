@@ -195,13 +195,13 @@ if __name__ == '__main__':
         help="Preprocess mode ('best', 'best_tgt', 'full')")
     parser.add_argument("--output_path", type=str, required=True,
         help="Path where to store the incremental examples")
-    parser.add_argument("--lms_gpu", action='store_true',
-        help="Whether to run the LMScorer on GPU.")
+    parser.add_argument("--lms_device", default="cpu", type=str, required=True,
+        help="Device for the sentence scorer ('cpu' / 'cuda').")
     parser.add_argument('--splits', type=str, nargs='+', default=["train", "dev", "test"],
                     help='Dataset splits (e.g. train dev test)')
     args = parser.parse_args()
 
-    lms_device = 'cuda' if args.lms_gpu else 'cpu'
+    lms_device = 'cuda' if args.lms_device == 'gpu' else 'cpu'
 
     # Load dataset class
     try:
