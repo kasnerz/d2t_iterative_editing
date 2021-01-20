@@ -1,15 +1,19 @@
 #!/bin/bash
 
+# # WebNLG, E2E
+# DATASET="WebNLG"
+# DATA_PATH="$PWD/datasets/webnlg/data/v1.4/en/"
 
-DATASET="WebNLG"
+# E2E
+DATASET="E2E"
+DATA_PATH="$PWD/datasets/e2e-cleaning/cleaned-data"
 
-DATA_PATH="$PWD/datasets/webnlg/data/v1.4/en/"
 OUTPUT_PATH="$PWD/data"
 
 # "full": all lexicalizations
 # "best": best lexicalizations according to LMScorer (source, target)
 # "best_tgt": all lexicalizations (source) and best lexicalizations according to LMScorer (target)
-MODE=best
+MODE=best_tgt
 
 # size of the LaserTagger vocabulary
 VOCAB_SIZE=100

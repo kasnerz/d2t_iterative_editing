@@ -155,8 +155,8 @@ if __name__ == "__main__":
         help="Maximum sequence length.")
     parser.add_argument("--is_uncased", default=False, action='store_true',
         help="Whether to lower case the input text.")
-    parser.add_argument("--lms_device", default="cpu", type=str, required=True,
-        help="Device for the sentence scorer ('cpu' / 'cuda').")
+    parser.add_argument("--lms_gpu", action='store_true',
+        help="Whether to run the LMScorer on GPU.")
     parser.add_argument("--vocab_size", type=str, required=True,
         help="Phrase vocabulary size.")
     parser.add_argument("--reduce_mode", type=str, default="gmean",
@@ -176,6 +176,8 @@ if __name__ == "__main__":
     torch.manual_seed(args.seed)
     tf.random.set_random_seed(args.seed)
     np.random.seed(args.seed)
+
+    lms_device = 'cuda' if args.lms_gpu else 'cpu'
 
     # Load dataset class
     try:
@@ -211,7 +213,7 @@ if __name__ == "__main__":
                             is_uncased=args.is_uncased, max_seq_length=args.max_seq_length)
 
 
-        decoder = IncrementalDecoder(fuse_model, lms_device=args.lms_device,
+        decoder = IncrementalDecoder(fuse_model, lms_device=lms_device,
             reduce_mode=args.reduce_mode,
             export_file_handle=export_file_handle,
             use_e2e_double_templates=args.use_e2e_double_templates)

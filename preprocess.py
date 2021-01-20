@@ -195,11 +195,13 @@ if __name__ == '__main__':
         help="Preprocess mode ('best', 'best_tgt', 'full')")
     parser.add_argument("--output_path", type=str, required=True,
         help="Path where to store the incremental examples")
-    parser.add_argument("--lms_device", type=str, default="cuda",
-        help="Device to run the LMScorer on ('cpu' or 'cuda').")
+    parser.add_argument("--lms_gpu", action='store_true',
+        help="Whether to run the LMScorer on GPU.")
     parser.add_argument('--splits', type=str, nargs='+', default=["train", "dev", "test"],
                     help='Dataset splits (e.g. train dev test)')
     args = parser.parse_args()
+
+    lms_device = 'cuda' if args.lms_gpu else 'cpu'
 
     # Load dataset class
     try:
@@ -232,12 +234,12 @@ if __name__ == '__main__':
         dataset.load_templates(out_dirname)
 
         # Extract incremental examples
-        preprocessor = Preprocessor(dataset=dataset, mode=args.mode, device=args.lms_device)
+        preprocessor = Preprocessor(dataset=dataset, mode=args.mode, device=lms_device)
         logger.info(f"Processing the {args.dataset} dataset (mode={args.mode})")
         preprocessor.extract_incremental(splits=args.splits, output_path=out_dirname)
 
     # DiscoFuse: dataset can be sent directly to output
     else:
         for split in args.splits:
-            preprocessor = Preprocessor(dataset=dataset, mode=args.mode, device=args.lms_device)
+            preprocessor = Preprocessor(dataset=dataset, mode=args.mode, device=lms_device)
             preprocessor.write(out_dirname, split, dataset.data[split])
