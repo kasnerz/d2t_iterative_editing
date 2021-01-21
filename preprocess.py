@@ -188,29 +188,29 @@ class Preprocessor:
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", type=str, required=True,
-        help="Dataset name.")
+        help="Dataset class.")
     parser.add_argument("--input", type=str, required=True,
         help="Path to the dataset")
     parser.add_argument("--mode", type=str, required=True,
         help="Preprocess mode ('best', 'best_tgt', 'full')")
-    parser.add_argument("--output_path", type=str, required=True,
-        help="Path where to store the incremental examples")
     parser.add_argument("--lms_device", default="cpu", type=str, required=True,
         help="Device for the sentence scorer ('cpu' / 'cuda').")
+    parser.add_argument("--force_generate_templates", action='store_true',
+        help="Re-generate the templates which can be generated automatically.")
     parser.add_argument('--splits', type=str, nargs='+', default=["train", "dev", "test"],
                     help='Dataset splits (e.g. train dev test)')
     args = parser.parse_args()
 
     lms_device = 'cuda' if args.lms_device == 'gpu' else 'cpu'
 
-    # Load dataset class
+    # Load dataset class by name
     try:
         dataset_mod = __import__("datasets", fromlist=[args.dataset])
         dataset_cls = getattr(dataset_mod, args.dataset)
         dataset = dataset_cls()
-    except AttributeError:
+    except AttributeError as err:
         logger.error(f"Unknown dataset: '{args.dataset}'. Please create a class '{args.dataset}' in 'datasets.py'.")
-        exit()
+        raise err
 
     # Load data
     logger.info(f"Loading dataset {args.dataset}")
@@ -222,16 +222,16 @@ if __name__ == '__main__':
 
     # Create output directory
     try:
-        out_dirname = os.path.join(args.output_path, dataset.name)
+        out_dirname = os.path.join("data", dataset.name)
         os.makedirs(out_dirname, exist_ok=True)
-    except OSError:
+    except OSError as err:
         logger.error(f"Output directory {out_dirname} can not be created")
-        exit()
+        raise err
 
     # WebNLG / E2E / ...
     if dataset.is_d2t:
         # Load or extract templates
-        dataset.load_templates(out_dirname)
+        dataset.load_templates(out_dirname, args.force_generate_templates)
 
         # Extract incremental examples
         preprocessor = Preprocessor(dataset=dataset, mode=args.mode, device=lms_device)
@@ -242,4 +242,6 @@ if __name__ == '__main__':
     else:
         for split in args.splits:
             preprocessor = Preprocessor(dataset=dataset, mode=args.mode, device=lms_device)
-            preprocessor.write(out_dirname, split, dataset.data[split])
+            preprocessor.process(out_dirname, split, dataset.data[split])
+
+    logger.info(f"Preprocessing finished.")

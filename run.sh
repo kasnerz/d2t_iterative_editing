@@ -1,19 +1,21 @@
 #!/bin/bash
 
-# # WebNLG, E2E
+# # WebNLG
 # DATASET="WebNLG"
-# DATA_PATH="$PWD/datasets/webnlg/data/v1.4/en/"
+# DATASET_PATH="./datasets/webnlg/data/v1.4/en/"
 
-# E2E
-DATASET="E2E"
-DATA_PATH="$PWD/datasets/e2e-cleaning/cleaned-data"
+# # E2E
+# DATASET="E2E"
+# DATASET_PATH="./datasets/e2e-cleaning/cleaned-data"
 
-OUTPUT_PATH="$PWD/data"
+# DiscoFuse
+DATASET="DiscoFuse"
+DATASET_PATH="./datasets/discofuse/discofuse_v1/wikipedia"
 
 # "full": all lexicalizations
-# "best": best lexicalizations according to LMScorer (source, target)
+# "best": best lexicalizations according to LMScorer (source & target)
 # "best_tgt": all lexicalizations (source) and best lexicalizations according to LMScorer (target)
-MODE=full
+MODE=best
 
 # size of the LaserTagger vocabulary
 VOCAB_SIZE=100
@@ -22,22 +24,18 @@ VOCAB_SIZE=100
 # note that an extra GPU is needed in case the sentence fusion model also runs on GPU (which is recommended)
 # if mode=full, preprocessing does not use LMScorer and thus the parameter LMS_DEVICE_PREPROCESSING is unused
 LMS_DEVICE_PREPROCESSING=gpu
-LMS_DEVICE_DECODING=$USE_LMS_GPU_PREPROCESSING
+LMS_DEVICE_DECODING=cpu
 
 # experiment name (used for naming the experiment directory), e.g. webnlg_full
 EXPERIMENT_NAME="${DATASET,,}_${MODE}"
 
-# TODO increase
-NUM_TRAIN_STEPS=100
-
-mkdir -p "$OUTPUT_PATH"
-
+# number of LT finetuning steps
+NUM_TRAIN_STEPS=10000
 
 python3 preprocess.py \
     --dataset "$DATASET" \
-    --input "$DATA_PATH" \
+    --input "$DATASET_PATH" \
     --mode "$MODE" \
-    --output_path "$OUTPUT_PATH" \
     --splits "train" "test" "dev" \
     --lms_device "$LMS_DEVICE_PREPROCESSING"
 
@@ -51,7 +49,8 @@ python3 train.py \
 python3 decode.py \
     --dataset "$DATASET" \
     --experiment "$EXPERIMENT_NAME" \
-    --dataset_dir "$DATA_PATH" \
+    --dataset_dir "$DATASET_PATH" \
     --vocab_size "$VOCAB_SIZE" \
     --lms_device "$LMS_DEVICE_DECODING" \
-    --split dev
+    --split dev \
+    --use_e2e_double_templates
