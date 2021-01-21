@@ -2,9 +2,9 @@
 
 The code for generating text from RDF triples by iteratively applying sentence fusion on the templates.
 
-The method is described in: 
+A detailed description of the method can be found in: 
 
-- Zdeněk Kasner & Ondřej Dušek (2020): [Data-to-Text Generation with Iterative Text Editing.](https://www.aclweb.org/anthology/2020.inlg-1.9/) In: *Proceedings of the 13th International Conference on Natural Language Generation (INLG 2020)* 
+ > Zdeněk Kasner & Ondřej Dušek (2020): [Data-to-Text Generation with Iterative Text Editing.](https://www.aclweb.org/anthology/2020.inlg-1.9/) In: *Proceedings of the 13th International Conference on Natural Language Generation (INLG 2020)* 
 
 ## Model Overview
 ![overview](model.png)
@@ -48,7 +48,7 @@ All datasets and models can be downloaded using the command:
 ./download_datasets_and_models.sh
 ```
 
-The following is the description of the dependencies (datasets, models and external repositiories) which are downloaded by the script. The script does not download the dependencies which are already located in their respective path.
+The following lists the dependencies (datasets, models and external repositiories) downloaded by the script. The script does not download the dependencies which are already located in their respective path.
 
 #### Datasets
 - [WebNLG dataset](https://github.com/ThiagoCF05/webnlg) (v1.4)
@@ -60,7 +60,7 @@ The following is the description of the dependencies (datasets, models and exter
 
 #### Models
 - [BERT](https://github.com/google-research/bert) - original TensorFlow implementation from Google (utilized by [LaserTagger](https://github.com/google-research/lasertagger))
-- Additionally, [LMScorer](https://github.com/simonepri/lm-scorer) requires [GPT-2](https://huggingface.co/transformers/model_doc/gpt2.html) downloaded automatically by 🤗 Transformers.
+- (additionally, [LMScorer](https://github.com/simonepri/lm-scorer) requires [GPT-2](https://huggingface.co/transformers/model_doc/gpt2.html) which is downloaded automatically by 🤗 Transformers)
 
 ### Pipeline Overview
 The pipeline involves three steps:
@@ -95,12 +95,12 @@ Things you may want to consider:
 - The **mode** for selecting the lexicalizations (`--mode`) can be set to `full`, `best_tgt` or `best`. The modes are described in the supplementary material of the paper.
   - The default mode is `full` and runs on CPU.
   - Modes `best_tgt` and `best`  use *LMScorer*  and can use GPU (`--lms_device gpu`).
-- The **templates** for the predicates are included in the repository. In order to re-generate simple templates for WebNLG and double templates for E2E, use the flag `--force-generate-templates`. However, note that double templates for E2E have been manually denoised (the generated version will not be identical to the one use in the experiments).
+- The **templates** for the predicates are included in the repository. In order to re-generate simple templates for WebNLG and double templates for E2E, use the flag `--force-generate-templates`. However, note that double templates for E2E have been manually denoised (the generated version will not be identical to the one used in the experiments).
   - **TODO FLAG** 
 - Using a **custom dataset** based on RDF triples requires editing `datasets.py`: adding a custom class derived from `Dataset` and overriding relevant methods. The dataset is then selected with the parameter `--dataset` using the class name as an argument.
 
 ### Training
-Training involves training the sentence fusion model and generally follows the pipeline described in the [LaserTagger repository](https://github.com/kasnerz/lasertagger). However, instead of using individual scripts for each step, the training pipeline is encapsulated in  `train.py`.
+Training generally follows the pipeline described in the [LaserTagger repository](https://github.com/kasnerz/lasertagger). However, instead of using individual scripts for each step, the training pipeline is encapsulated in  `train.py`.
 
 Example of using the training script:
 
@@ -115,12 +115,12 @@ python3 train.py \
 
 Things you may want to consider:
 - The **size of the vocabulary** determines the number of phrases used by LaserTagger (see the paper for details). The value 100 was used in the final experiments. 
-- The **wrapper for LaserTagger** is implemented in `model_tf.py`. The wrapper calls the methods from the LaserTagger repository (directory `lasertagger_tf`) similarly to the original implementation. This is a temporary solution: we are working on implementing a custom PyTorch version of LaserTagger, which should be more clear and flexible.
+- The **wrapper for LaserTagger** is implemented in `model_tf.py`. The wrapper calls the methods from the LaserTagger repository (directory `lasertagger_tf`) similarly to the original implementation. *This is a temporary solution: we are working on implementing a custom PyTorch version of LaserTagger, which should be more clear and flexible.*
 - For debugging, the **number of training steps** can be lowered e.g. to 100.
-- If you have the correct Tensorflow version (`tensorflow-1.15-gpu`) and GPU is not used, check is CUDA libraries were linked correctly.
+- If you have the correct Tensorflow version (`tensorflow-1.15-gpu`) but a GPU is not used, check if CUDA libraries were linked correctly.
 
 ### Decoding
-Once the model is trained, the decoding algorithm can be run to generate text from RDF triples. See the top figure and the paper for details on the method.
+Once the model is trained, the decoding algorithm is used to generate text from RDF triples. See the top figure and/or the paper for the details on the method.
 
 Example of using the decoding script:
 ```bash
