@@ -113,7 +113,7 @@ python3 train.py \
 Things you may want to consider:
 - The size of the vocabulary determines the number of phrases used by LaserTagger (see the paper for details). The value 100 was used in the final experiments. 
 - The wrapper for LaserTagger is implemented in `model_tf.py`. The wrapper calls the methods from the LaserTagger repository (directory `lasertagger_tf`) similarly to the original implementation.
-  - *This is a temporary solution: we are working on implementing a custom PyTorch version of LaserTagger, which should be more clear and flexible. However, the solution will use a wrapper similar to this.*
+  - *This is a temporary solution: we are working on implementing a custom PyTorch version of LaserTagger, which should be more clear and flexible.*
 - For debugging, the number of training steps can be lowered e.g. to 100.
 - Parameters `--train_only` and `--export_only` can be used to skip other pipeline phases.
 - If you have the correct Tensorflow version (`tensorflow-1.15-gpu`) but a GPU is not used, check if CUDA libraries were linked correctly.
@@ -134,12 +134,22 @@ python3 decode.py \
 
 Things you may want to consider:
 - Decoding will be faster if the LMScorer is allowed to run on GPU (`--lms_device gpu`). Note however this requires a secondary GPU, as the GPU is primarily used for LaserTagger.
-- Output will be stored under `experiments/<experiment_name>/<vocabulary_size>/` #TODO.
-- Use the flag `--use_e2e_double_templates` for starting the decoding from the templates for pairs of triples in the case of the E2E dataset. Single templates (handcrafted for E2E) are used otherwise.
-
+- Output will be stored as `out/<experiment>_<vocab_size>_<split>.hyp`.
+- Use the flag `--use_e2e_double_templates` for bootstrapping the decoding process from the templates for pairs of triples in the case of the E2E dataset. The templates for single triples (handcrafted for E2E) are used otherwise.
+- Use the flag `--no_export` in order to suppress saving the output to the `out` directory.
 
 ### Evaluation
 TODO
+
+Example of using the evaluation script:
+```bash
+python3 evaluate.py \
+    --ref_file TODO \
+    --hyp_file "out/webnlg_full_100_dev.hyp" \
+    --lowercase
+```
+TODO add to run.sh
+
 
 ## Citation
 ```

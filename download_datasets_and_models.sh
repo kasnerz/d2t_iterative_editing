@@ -56,6 +56,18 @@ if [[ ! -d lasertagger_tf ]]; then
     mv "lasertagger" "lasertagger_tf"
 fi
 
+# E2E metrics
+if [[ ! -d e2e-metrics ]]; then
+    echo "======================================================"
+    echo "Cloning the E2E metrics..."
+    echo "======================================================"
+    git clone "https://github.com/tuetschek/e2e-metrics.git"
+    mv "e2e-metrics" "e2e_metrics"
+    cd "e2e_metrics"
+    git checkout "dca5d301a97f7264b0827fb5589c0cc51008b5d7" 2>/dev/null
+    cd ..
+fi
+
 # BERT
 cd "lasertagger_tf"
 
@@ -75,6 +87,3 @@ if [[ ! -d bert ]]; then
 fi
 
 cd ..
-
-# TODO GPT-2
-# TODO edited templates

@@ -165,8 +165,8 @@ if __name__ == "__main__":
         help="Random seed.")
     parser.add_argument("--max_threads", default=8, type=int,
         help="Maximum number of threads.")
-    parser.add_argument("--export", default=False, action='store_true',
-        help="Export results.")
+    parser.add_argument("--no_export", action='store_true',
+        help="Do not export the output (print only).")
     parser.add_argument("--use_e2e_double_templates", default=False, action='store_true',
         help="For E2E templates, start with templates for two properties simultaneously extracted from the data.")
     args = parser.parse_args()
@@ -197,11 +197,12 @@ if __name__ == "__main__":
     torch.set_num_threads(args.max_threads)
 
     for split in args.splits:
-        if args.export:
-            export_file_handle = open(os.path.join(args.exp_dir, args.experiment,
-                args.vocab_size, "models", "export", f"{split}.out"), "w")
-        else:
+        if args.no_export:
             export_file_handle = None
+        else:
+            os.makedirs("out", exist_ok=True)
+            out_filename = f"{args.experiment}_{args.vocab_size}_{split}.hyp"
+            export_file_handle = open(os.path.join("out", out_filename), "w")
 
         fuse_model = LaserTaggerTF()
 
@@ -222,5 +223,5 @@ if __name__ == "__main__":
 
         decoder.decode(dataset, split)
 
-        if export_file_handle:
+        if export_file_handle is not None:
             export_file_handle.close()

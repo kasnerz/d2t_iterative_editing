@@ -67,7 +67,7 @@ class Dataset:
         raise NotImplementedError
 
 
-    def load_templates(self, output_dir, force_generate_templates):
+    def load_templates(self, output_dir, force_generate_templates=False):
         """Loads existing templates from a JSON file"""
         templates_filename = os.path.join(output_dir, "templates.json")
 
@@ -77,7 +77,7 @@ class Dataset:
                 self.templates = json.load(f)
         else:
             logger.info("Templates will be extracted from the training data")
-            self.extract_templates(output_dir)
+            self.templates = self.extract_templates(templates_filename)
 
 
     def get_templates(self, triple):
@@ -253,7 +253,7 @@ class E2E(Dataset):
             logger.warn(f"{err} corrupted instances")
 
 
-    def load_templates(self, output_dir, force_generate_templates):
+    def load_templates(self, output_dir, force_generate_templates=False):
         """
         Loads existing templates from a JSON file
         Single-triple templates have to be created manually
@@ -277,7 +277,7 @@ class E2E(Dataset):
                 self.templates_double = json.load(f)
         else:
             logger.info("Double-triple templates will be extracted from the training data")
-            self._extract_double_templates(templates_double_filename)
+            self.templates_double = self._extract_double_templates(templates_double_filename)
 
 
     def _mr_to_triples(self, mr):
