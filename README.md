@@ -2,7 +2,7 @@
 
 The code for generating text from RDF triples by iteratively applying sentence fusion on the templates.
 
-A detailed description of the method can be found in: 
+A description of the method can be found in: 
 
  > Zdeněk Kasner & Ondřej Dušek (2020): [Data-to-Text Generation with Iterative Text Editing.](https://www.aclweb.org/anthology/2020.inlg-1.9/) In: *Proceedings of the 13th International Conference on Natural Language Generation (INLG 2020)*.
 
@@ -19,9 +19,9 @@ pip install -r requirements.txt
 ```bash
 ./download_datasets_and_models.sh
 ```
-3. Run the experiments with default settings including preprocessing the data, training the model, decoding the data and evaluating the results: 
+3. Run an experiment on the WebNLG dataset with default settings including preprocessing the data, training the model, decoding the data and evaluating the results: 
 ```bash
-./run.sh
+./run.sh webnlg
 ```
 
 ## Usage Instructions
@@ -53,14 +53,15 @@ The following lists the dependencies (datasets, models and external repositiorie
 #### Datasets
 - [WebNLG dataset](https://github.com/ThiagoCF05/webnlg) (v1.4)
 - [Cleaned E2E Challenge dataset](https://github.com/tuetschek/e2e-cleaning)
-- [DiscoFuse dataset](https://github.com/google-research-datasets/discofuse) (balanced Wikipedia part)
+- [DiscoFuse dataset](https://github.com/google-research-datasets/discofuse) (Wikipedia part)
 
 #### External Repositories
 - [LaserTagger](https://github.com/kasnerz/lasertagger) - fork of the original LaserTagger implementation featuring a few changes necessary for integration with the model
+- [E2E Metrics](https://github.com/tuetschek/e2e-metrics) - a set of evaluation metrics used in the E2E Challenge
 
 #### Models
 - [BERT](https://github.com/google-research/bert) - original TensorFlow implementation from Google (utilized by [LaserTagger](https://github.com/google-research/lasertagger))
-- (+ [LMScorer](https://github.com/simonepri/lm-scorer) requires [GPT-2](https://huggingface.co/transformers/model_doc/gpt2.html) which is downloaded automatically by the `transformers` package)
+- (+ [LMScorer](https://github.com/simonepri/lm-scorer) requires [GPT-2](https://huggingface.co/transformers/model_doc/gpt2.html); downloaded automatically by the `transformers` package)
 
 ### Pipeline Overview
 The pipeline involves four steps:
@@ -69,11 +70,15 @@ The pipeline involves four steps:
 3. **running** the decoding algorithm
 4. **evaluating** the results
 
-All steps can be run at once using the script
+All steps can be run separately by following the instructions below, or all at once using the script
 ```
-./run.sh
+./run.sh <experiment>
 ```
-(checking the parameters is recommended) or separately by following the instructions below.
+where `<experiment>` can be one of:
+- `webnlg` - train and evaluate on the WebNLG dataset
+- `e2e` - train and evaluate on the E2E dataset
+- `df-webnlg` - train on DiscoFuse and evaluate on WebNLG (zero shot domain adaptation)
+- `df-e2e` - train on DiscoFuse and evaluate on E2E (zero shot domain adaptation)
 
 ### Preprocessing
 Preprocessing involves parsing the original data-to-text datasets and extracting examples for training the sentence fusion model.
@@ -127,28 +132,27 @@ python3 decode.py \
     --dataset "WebNLG" \
     --experiment "webnlg_full" \
     --dataset_dir "datasets/webnlg/data/v1.4/en/" \
-    --split "dev" \
+    --split "test" \
     --lms_device "cpu" \
     --vocab_size 100
 ```
 
 Things you may want to consider:
-- Decoding will be faster if the LMScorer is allowed to run on GPU (`--lms_device gpu`). Note however this requires a secondary GPU, as the GPU is primarily used for LaserTagger.
+- Decoding will be faster if the LMScorer is allowed to run on GPU (`--lms_device gpu`). Note however this may require a secondary GPU if the GPU is already used for LaserTagger.
 - Output will be stored as `out/<experiment>_<vocab_size>_<split>.hyp`.
 - Use the flag `--use_e2e_double_templates` for bootstrapping the decoding process from the templates for pairs of triples in the case of the E2E dataset. The templates for single triples (handcrafted for E2E) are used otherwise.
 - Use the flag `--no_export` in order to suppress saving the output to the `out` directory.
 
 ### Evaluation
-TODO
+The decoded output is evaluated against multiple references using the `e2e-metrics` package.
 
 Example of using the evaluation script:
 ```bash
 python3 evaluate.py \
-    --ref_file TODO \
-    --hyp_file "out/webnlg_full_100_dev.hyp" \
+    --ref_file "data/webnlg/ref/test.ref" \
+    --hyp_file "out/webnlg_full_100_test.out" \
     --lowercase
 ```
-TODO add to run.sh
 
 
 ## Citation

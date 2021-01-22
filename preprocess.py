@@ -127,6 +127,21 @@ class Preprocessor:
                 logger.info(f"{entries_processed} entries processed, {samples_processed} samples extracted")
                 log_next_percentage += log_step
 
+    def save_orig_references(self, output_path):
+        ref_dir = os.path.join(output_path, "ref")
+        os.makedirs(ref_dir, exist_ok=True)
+
+        logger.info(f"Saving references to {ref_dir}")
+
+        for split in ["dev", "test"]:
+            f_ref = open(os.path.join(ref_dir, f"{split}.ref"), "w")
+
+            for entry in self.dataset.data[split]:
+                lexs = "\n".join([l['target_txt'] for l in entry.lexs])
+
+                f_ref.write(lexs + "\n\n")
+
+
 
     def _fill_template(self, template, triple):
         """
@@ -237,6 +252,10 @@ if __name__ == '__main__':
         preprocessor = Preprocessor(dataset=dataset, mode=args.mode, device=lms_device)
         logger.info(f"Processing the {args.dataset} dataset (mode={args.mode})")
         preprocessor.extract_incremental(splits=args.splits, output_path=out_dirname)
+
+        # Extract references for later evaluation
+        if "dev" in args.splits and "test" in args.splits:
+            preprocessor.save_orig_references(output_path=out_dirname)
 
     # DiscoFuse: dataset can be sent directly to output
     else:

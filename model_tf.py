@@ -217,3 +217,4 @@ class LaserTaggerTF(FuseModel):
             shutil.move(os.path.join(latest_subdir, "saved_model.pb"), flags.export_path)
             shutil.move(os.path.join(latest_subdir, "variables"), flags.export_path)
             os.rmdir(latest_subdir)
+            logger.info(f"Model exported to {flags.export_path}")

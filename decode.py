@@ -131,9 +131,6 @@ class IncrementalDecoder:
 
     def decode(self, dataset, split):
         for i, entry in enumerate(dataset.data[split]):
-            #TODO debug
-            if len(entry.triples) == 1:
-                continue
             self._decode_entry(dataset, entry)
 
 
