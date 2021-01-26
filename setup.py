@@ -9,7 +9,6 @@ setup(
     author='Zdeněk Kasner',
     author_email='kasner@ufal.mff.cuni.cz',
     url='https://github.com/kasnerz/d2t_iterative_editing',
-    install_requires=['pytorch-lightning'],
     packages=find_packages(),
 )
 
