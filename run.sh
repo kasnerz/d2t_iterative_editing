@@ -54,11 +54,10 @@ LMS_DEVICE_DECODING=cpu
 EXPERIMENT_NAME="${1,,}_${MODE}"
 
 # number of LT finetuning steps
-NUM_TRAIN_STEPS=100
+NUM_TRAIN_STEPS=10000
 
 # which data split to decode and evaluate (dev / test)
 DECODE_AND_EVAL_SPLIT=test
-
 
 
 python3 preprocess.py \
@@ -68,6 +67,7 @@ python3 preprocess.py \
     --splits "train" "test" "dev" \
     --lms_device "$LMS_DEVICE_PREPROCESSING"
 
+# zero-shot domain adaptation experiments
 if [ $DATASET_TRAIN != $DATASET_EVAL ]; then
     python3 preprocess.py \
         --dataset "$DATASET_EVAL" \
@@ -95,5 +95,5 @@ python3 decode.py \
 
 python3 evaluate.py \
     --ref_file "data/${DATASET_EVAL,,}/ref/$DECODE_AND_EVAL_SPLIT.ref" \
-    --hyp_file "out/$EXPERIMENT_NAME_$VOCAB_SIZE_$DECODE_AND_EVAL_SPLIT.out" \
+    --hyp_file "out/${EXPERIMENT_NAME}_${VOCAB_SIZE}_${DECODE_AND_EVAL_SPLIT}.hyp" \
     --lowercase

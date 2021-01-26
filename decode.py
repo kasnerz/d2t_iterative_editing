@@ -44,33 +44,42 @@ class IncrementalDecoder:
         return self.sentence_scorer.select_best(sentences)
 
 
-    # def fill_template_double(self, template, sorted_triples):
-    #     subj, _, obj1 = sorted_triples[0]
-    #     obj2 = sorted_triples[1][2]
-
-    #     template = template.replace("<subject>", self.tokenizer.tokenize(subj)) \
-    #                         .replace("<object1>", self.tokenizer.tokenize(obj1)) \
-    #                         .replace("<object2>", self.tokenizer.tokenize(obj2))
-    #     return template
+    def fill_template_double(self, template, sorted_triples):
+        subj = sorted_triples[0].subj
+        obj1 = sorted_triples[0].obj
+        obj2 = sorted_triples[1].obj
 
 
-    # def _triple_to_template_double(self, dataset, triples):
-    #     res = dataset.select_triples_for_double_template(triples)
+        template = template.replace("<subject>", self.tokenizer.tokenize(subj)) \
+                            .replace("<object1>", self.tokenizer.tokenize(obj1)) \
+                            .replace("<object2>", self.tokenizer.tokenize(obj2))
+        return template
 
-    #     if not res:
-    #         print("Cannot find double template, using a single fallback")
-    #         return None, [], triples
 
-    #     templates, idx1, idx2 = res
-    #     sorted_triples = [triples[idx1], triples[idx2]]
-    #     additional_triples = [triple for i, triple in enumerate(triples) if i != idx1 and i != idx2]
-    #     sentences = []
+    def _triple_to_template_double(self, dataset, triples):
+        # key for double templates is sorted alphabetically
+        triples = sorted(triples, key=lambda t:t.pred)
 
-    #     for template in templates:
-    #         sentence = self.fill_template_double(template, sorted_triples)
-    #         sentences.append(sentence)
+        res = dataset.select_triples_for_double_template(triples)
 
-    #     return self.sentence_scorer.select_best(sentences), sorted_triples, additional_triples
+        if not res:
+            logger.info("Cannot find double template, using a single fallback")
+            return None, [], triples
+
+        templates, idx1, idx2 = res
+
+        # triples for which a double template will be used
+        double_triples = [triples[idx1], triples[idx2]]
+
+        # remaining triples
+        additional_triples = [triple for i, triple in enumerate(triples) if i != idx1 and i != idx2]
+        sentences = []
+
+        for template in templates:
+            sentence = self.fill_template_double(template, double_triples)
+            sentences.append(sentence)
+
+        return self.sentence_scorer.select_best(sentences), double_triples, additional_triples
 
 
 
@@ -93,7 +102,6 @@ class IncrementalDecoder:
 
         current_text = None
 
-        #TODO check
         if dataset.name == "e2e" and self.use_e2e_double_templates and len(triples) > 1:
             current_text, used_triples, additional_triples = self._triple_to_template_double(dataset, triples)
 
@@ -126,11 +134,13 @@ class IncrementalDecoder:
         if self.export_file_handle:
             self.export_file_handle.write(self.tokenizer.detokenize(current_text) + "\n")
 
-        logger.info("------------")
+        logger.info("=========================")
 
 
     def decode(self, dataset, split):
         for i, entry in enumerate(dataset.data[split]):
+            logger.info(f"Example {i}")
+            logger.info(f"-------------"
             self._decode_entry(dataset, entry)
 
 
@@ -222,3 +232,5 @@ if __name__ == "__main__":
 
         if export_file_handle is not None:
             export_file_handle.close()
+
+    logger.info("Decoding finished.")

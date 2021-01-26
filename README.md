@@ -150,7 +150,7 @@ Example of using the evaluation script:
 ```bash
 python3 evaluate.py \
     --ref_file "data/webnlg/ref/test.ref" \
-    --hyp_file "out/webnlg_full_100_test.out" \
+    --hyp_file "out/webnlg_full_100_test.hyp" \
     --lowercase
 ```
 

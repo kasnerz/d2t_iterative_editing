@@ -12,8 +12,8 @@ import measure_scores
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO, datefmt='%H:%M:%S')
 logger = logging.getLogger(__name__)
 
-def evaluate(hyp_file, args):
-    data_src, data_ref, data_sys = measure_scores.load_data(args.ref_file, hyp_file, None)
+def evaluate(args):
+    data_src, data_ref, data_sys = measure_scores.load_data(args.ref_file, args.hyp_file, None)
 
     if args.lowercase:
         data_src = [sent.lower() for sent in data_src]
@@ -32,4 +32,4 @@ if __name__ == "__main__":
         help="Evaluate on lower-cased files.")
     args = parser.parse_args()
 
-    evaluate(args.hyp_file, args)
+    evaluate(args)

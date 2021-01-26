@@ -197,15 +197,19 @@ def check_facts(sent, triples):
         if triple.pred == "name":
             continue
 
+        obj = triple.obj
+
         if triple.pred == "near":
             if triple.obj not in sent:
                 return False
-            triple.obj = "near"
+            obj = "near"
 
-        assert triple.pred in regex_dict, f"Cannot find {triple.pred} in {regex_dict.keys()}"
-        assert triple.obj in regex_dict[triple.pred], f"Cannot find {triple.obj} in {regex_dict[triple.pred]}"
+        pred = triple.pred
 
-        pattern_list = regex_dict[triple.pred][triple.obj]
+        assert pred in regex_dict, f"Cannot find {pred} in {regex_dict.keys()}"
+        assert obj in regex_dict[pred], f"Cannot find {obj} in {regex_dict[pred]}"
+
+        pattern_list = regex_dict[pred][obj]
         pattern = compile_patterns(pattern_list)
 
         res = re.search(pattern, sent)

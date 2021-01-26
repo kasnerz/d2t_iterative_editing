@@ -5,6 +5,7 @@ import csv
 import os
 import logging
 import re
+import random
 
 from utils import e2e_checker
 
@@ -331,38 +332,37 @@ class E2E(Dataset):
         return tuple(triples)
 
 
-    # def select_triples_for_double_template(self, triples):
-    #     sorted_triples = sorted(triples, key=lambda t:t[1])
-    #     triple_pairs = [(s,t,i,j) for j,t in enumerate(sorted_triples) for i,s in enumerate(sorted_triples) if s[1] < t[1]]
+    def select_triples_for_double_template(self, sorted_triples):
+        # find all pairs of triples for which there potentially exists a double template
+        triple_pairs = [(s,t,i,j) for j,t in enumerate(sorted_triples) for i,s in enumerate(sorted_triples) if s[1] < t[1]]
 
-    #     templates = list(filter(lambda x: x[0] is not None,
-    #         [(self.get_templates_multiple(tp[:2]),tp[2],tp[3]) for tp in triple_pairs]))
+        # keeping also subject and object because the predicate familyFriendly behaves differently
+        templates = list(filter(lambda x: x[0] is not None,
+            [(self.get_templates_multiple(tp[:2]),tp[2],tp[3]) for tp in triple_pairs]))
 
-    #     if templates:
-    #         return random.choice(templates)
+        if templates:
+            return random.choice(templates)
 
-    #     return None
+        return None
 
 
     def get_key_multiple(self, sorted_triples):
-        slots = []
+        preds = []
         for triple in sorted_triples:
             # special case, boolean value
             if triple.pred == "familyFriendly":
-                slot = ("is" if triple.obj == "yes" else "not") + "FamilyFriendly"
+                pred = ("is" if triple.obj == "yes" else "not") + "FamilyFriendly"
             else:
-                slot = triple.pred
+                pred = triple.pred
 
-            slots.append(slot)
+            preds.append(pred)
 
-        key = ", ".join(slots)
+        key = ", ".join(preds)
         return key
 
 
     def get_templates_multiple(self, triples):
-        sorted_triples = sorted(triples, key=lambda t:t[1])
-
-        key = self.get_key_multiple(sorted_triples)
+        key = self.get_key_multiple(triples)
 
         if key in self.templates_double:
             templates = self.templates_double[key]
@@ -443,7 +443,7 @@ class E2E(Dataset):
         return templates
 
 
-    def check_facts(self, sent, triples):
+    def check_facts(self, sent, triples, tokenizer):
         return e2e_checker.check_facts(sent, triples)
 
 
