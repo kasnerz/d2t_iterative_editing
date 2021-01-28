@@ -71,6 +71,8 @@ class LaserTaggerTF(FuseModel):
         3. training
         """
 
+        tf.config.threading.set_intra_op_parallelism_threads(train_args.max_threads)
+
         exp_output_dir = os.path.join(train_args.output_dir,
             train_args.experiment,
             str(train_args.vocab_size)
@@ -187,6 +189,7 @@ class LaserTaggerTF(FuseModel):
 
         with open(os.path.join(exp_output_dir, "dev.tf_record.num_examples.txt"), "r") as f:
             flags.num_eval_examples = int(f.read().strip())
+
 
         if not export_only:
             run_lasertagger.main(flags)

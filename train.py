@@ -35,6 +35,8 @@ if __name__ == '__main__':
         help="Skip phrase vocabulary optimization, converting text to tags and exporting the model")
     parser.add_argument("--export_only", action="store_true",
         help="Skip phrase vocabulary optimization, converting text to tags and training the model")
+    parser.add_argument("--max_threads", type=int, default=8,
+        help="Maximum number of CPU threads used for training (default=8)")
     args = parser.parse_args()
 
 
