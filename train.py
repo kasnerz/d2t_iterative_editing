@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
-from model_tf import LaserTaggerTF
+# from model_tf import LaserTaggerTF
+from model import LaserTagger
 
 import logging
 import argparse
@@ -53,6 +54,7 @@ if __name__ == '__main__':
 
 
     logger.info("Initializing LaserTagger")
-    model = LaserTaggerTF()
+    # model = LaserTaggerTF()
+    model = LaserTagger()
 
     model.train(args, dataset_dir)

@@ -78,13 +78,13 @@ class LaserTaggerTF(FuseModel):
         os.makedirs(exp_output_dir, exist_ok=True)
 
         if not (train_args.train_only or train_args.export_only) :
-            self._phrase_vocabulary_optimization(
-                dataset_dir=dataset_dir,
-                vocab_size=train_args.vocab_size,
-                max_input_examples=train_args.max_input_examples,
-                exp_output_dir=exp_output_dir,
-                experiment_name=train_args.experiment
-            )
+            # self._phrase_vocabulary_optimization(
+            #     dataset_dir=dataset_dir,
+            #     vocab_size=train_args.vocab_size,
+            #     max_input_examples=train_args.max_input_examples,
+            #     exp_output_dir=exp_output_dir,
+            #     experiment_name=train_args.experiment
+            # )
             self._convert_text_to_tags(
                   dataset_dir=dataset_dir,
                   exp_output_dir=exp_output_dir,
