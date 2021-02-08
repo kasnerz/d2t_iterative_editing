@@ -9,6 +9,7 @@ import json
 import argparse
 import pytorch_lightning as pl
 import torch
+import warnings
 from torch.utils.data import DataLoader
 from data import get_dataset_class
 
@@ -117,8 +118,10 @@ class LTDataModule(pl.LightningDataModule):
                 batched=True,
                 remove_columns=['labels'],
             )
-            self.dataset[split].set_format(type="torch",
-                columns=["attention_mask", "token_type_ids", "input_ids", "labels"])
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", category=UserWarning)
+                self.dataset[split].set_format(type="torch",
+                    columns=["attention_mask", "token_type_ids", "input_ids", "labels"])
 
 
     def train_dataloader(self):
@@ -142,24 +145,26 @@ class LTDataModule(pl.LightningDataModule):
             max_length=self.args.max_length,
             padding='longest',
             truncation=True,
-            return_tensors='pt',
+            # return_tensors='pt',
             is_split_into_words=True
         )
         features['labels'] = self._align_labels_with_tokens(features, example_batch['labels'])
 
         return features
-        
+
 
     def _align_labels_with_tokens(self, features, labels):
         aligned_labels_batch = []
 
         for b in range(len(labels)):
-            aligned_labels = list(map(lambda l: None if l is None else labels[b][l], 
+            # TODO mask?
+            default_label = self.label_map["KEEP"]
+
+            aligned_labels = list(map(lambda l: default_label if l is None else labels[b][l], 
                 features.words(b)))
             aligned_labels_batch.append(aligned_labels)
 
-        return torch.Tensor(aligned_labels_batch)
-
+        return aligned_labels_batch
 
 
     def _phrase_vocabulary_optimization(self, dataset_dir, vocab_size, max_input_examples, exp_output_dir, experiment_name):
@@ -303,17 +308,21 @@ class LaserTagger(pl.LightningModule, FuseModel):
 
 
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
-        import pdb; pdb.set_trace()  # breakpoint 945af7b9 //
+        labels = batch["labels"]
+        input_ids = batch["input_ids"]
+        attention_mask = batch["attention_mask"]
+        token_type_ids = batch["token_type_ids"]
 
-        outputs = self(**batch)
+        outputs = self(
+            input_ids=input_ids,
+            token_type_ids=token_type_ids,
+            attention_mask=attention_mask
+        )
+
+        import pdb; pdb.set_trace()  # breakpoint 99da852d //
         val_loss, logits = outputs[:2]
 
-        if self.hparams.num_labels >= 1:
-            preds = torch.argmax(logits, axis=1)
-        elif self.hparams.num_labels == 1:
-            preds = logits.squeeze()
-
-        labels = batch["labels"]
+        preds = torch.argmax(logits, axis=1)
 
         return {'loss': val_loss, "preds": preds, "labels": labels}
 
