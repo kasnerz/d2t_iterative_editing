@@ -15,6 +15,13 @@ from utils import webnlg_parsing
 RDFTriple = namedtuple('RDFTriple', 'subj pred obj')
 logger = logging.getLogger(__name__)
 
+def get_dataset_class(dataset_class):
+    try:
+        return globals()[dataset_class]
+    except AttributeError:
+        logger.error(f"Unknown dataset: '{args.dataset}'. Please create a class '{args.dataset}' in 'data.py'.")
+        return None
+
 
 class DataEntry:
     def __init__(self, triples, lexs):
@@ -26,8 +33,7 @@ class DataEntry:
 
 
 class Dataset:
-    def __init__(self, name):
-        self.name = name
+    def __init__(self):
         self.data = {split: [] for split in ["train", "dev", "test"]}
         self.fallback_templates = ["The <predicate> of <subject> is <object> ."]
 
@@ -104,8 +110,10 @@ class Dataset:
 
 
 class WebNLG(Dataset):
+    name="webnlg"
+
     def __init__(self):
-        super().__init__(name="webnlg")
+        super().__init__()
 
     def extract_templates(self, output_file):
         logger.info("Extracting templates")
@@ -216,8 +224,10 @@ class WebNLG(Dataset):
 
 
 class E2E(Dataset):
+    name="e2e"
+
     def __init__(self):
-        super().__init__(name="e2e")
+        super().__init__()
 
     def load_from_dir(self, path, splits):
         for split in splits:
@@ -448,8 +458,10 @@ class E2E(Dataset):
 
 
 class DiscoFuse(Dataset):
+    name="discofuse"
+
     def __init__(self):
-        super().__init__(name="discofuse")
+        super().__init__()
         self.is_d2t = False
 
     def load_from_dir(self, path, splits):

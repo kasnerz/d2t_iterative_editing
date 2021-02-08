@@ -187,6 +187,7 @@ if __name__ == "__main__":
     lms_device = 'cuda' if args.lms_device == 'gpu' else 'cpu'
 
     # Load dataset class
+    # TODO use a function from data.py
     try:
         dataset_mod = __import__("data", fromlist=[args.dataset])
         dataset_cls = getattr(dataset_mod, args.dataset)

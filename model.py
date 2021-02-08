@@ -6,25 +6,24 @@ import logging
 import re
 import shutil
 import json
-
+import argparse
 import pytorch_lightning as pl
 import torch
 from torch.utils.data import DataLoader
+from data import get_dataset_class
 
 from collections import defaultdict
 from datasets import load_dataset
 
 from lasertagger import phrase_vocabulary_optimization
 from lasertagger import preprocess_main
-
 from lasertagger import tagging
-
 from lasertagger import tagging_converter
 from lasertagger import utils
 
 from transformers import (
     AdamW,
-    AutoModelForSequenceClassification,
+    AutoModel,
     AutoConfig,
     AutoTokenizer,
     get_linear_schedule_with_warmup,
@@ -49,18 +48,15 @@ class FuseModel:
 
 class LTDataModule(pl.LightningDataModule):
 
-    def __init__(self, args, dataset_dir):
+    def __init__(self, args):
         super().__init__()
         self.args = args
-        self.dataset_dir = dataset_dir
+        self.tokenizer = AutoTokenizer.from_pretrained(self.args.model_name, use_fast=True)
+
+        # disable the "huggingface/tokenizers: The current process just got forked" warning
+        os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
         
-        # TODO can be used directly from args
-        self.num_labels = args.vocab_size
-        self.train_batch_size = args.batch_size
-        self.eval_batch_size = args.batch_size
-
-        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_fast=True)
-
     def prepare_data(self):
         """
         The training pipeline for LT:
@@ -68,6 +64,10 @@ class LTDataModule(pl.LightningDataModule):
         2. converting text to tags
         3. training the model
         """
+        dataset_name = get_dataset_class(self.args.dataset).name
+        self.dataset_dir = os.path.join("data",
+                               dataset_name,
+                               self.args.mode)
 
         exp_output_dir = os.path.join(self.args.output_dir,
             self.args.experiment,
@@ -100,8 +100,6 @@ class LTDataModule(pl.LightningDataModule):
                 output_arbitrary_targets_for_infeasible_examples=False
             )
 
-    
-
     def setup(self, stage):
         exp_output_dir = os.path.join(self.args.output_dir,
             self.args.experiment,
@@ -119,32 +117,49 @@ class LTDataModule(pl.LightningDataModule):
                 batched=True,
                 remove_columns=['labels'],
             )
- 
-            self.dataset[split].set_format(type="torch")
+            self.dataset[split].set_format(type="torch",
+                columns=["attention_mask", "token_type_ids", "input_ids", "labels"])
 
 
     def train_dataloader(self):
-        return DataLoader(self.dataset['train'], batch_size=self.train_batch_size)
+        return DataLoader(self.dataset['train'], batch_size=self.args.batch_size, num_workers=self.args.max_threads)
     
+
     def val_dataloader(self):
-        return DataLoader(self.dataset['validation'], batch_size=self.eval_batch_size)
+        return DataLoader(self.dataset['dev'], batch_size=self.args.batch_size, num_workers=self.args.max_threads)
 
     def test_dataloader(self):
-        return DataLoader(self.dataset['test'], batch_size=self.eval_batch_size)
+        return DataLoader(self.dataset['test'], batch_size=self.args.batch_size, num_workers=self.args.max_threads)
 
 
     def _convert_to_features(self, example_batch, indices=None):
-        # Tokenize the text/text pairs
-        features = self.tokenizer.batch_encode_plus(
-            example_batch["text"],
-            # max_length=self.args.max_seq_length,
-            # pad_to_max_length=True
-        )
+        tokens_batch = [sent.split() for sent in example_batch["text"]]
 
-        # Rename label to labels to make it easier to pass to model forward
-        features['labels'] = example_batch['labels']
+        # encode the pre-tokenized text
+        features = self.tokenizer.batch_encode_plus(
+            tokens_batch,
+            add_special_tokens=True,
+            max_length=self.args.max_length,
+            padding='longest',
+            truncation=True,
+            return_tensors='pt',
+            is_split_into_words=True
+        )
+        features['labels'] = self._align_labels_with_tokens(features, example_batch['labels'])
 
         return features
+        
+
+    def _align_labels_with_tokens(self, features, labels):
+        aligned_labels_batch = []
+
+        for b in range(len(labels)):
+            aligned_labels = list(map(lambda l: None if l is None else labels[b][l], 
+                features.words(b)))
+            aligned_labels_batch.append(aligned_labels)
+
+        return torch.Tensor(aligned_labels_batch)
+
 
 
     def _phrase_vocabulary_optimization(self, dataset_dir, vocab_size, max_input_examples, exp_output_dir, experiment_name):
@@ -168,9 +183,9 @@ class LTDataModule(pl.LightningDataModule):
         input_file = os.path.join(dataset_dir, split)
         output_file = os.path.join(exp_output_dir, f"{split}.json")
 
-        label_map = utils.read_label_map(label_map_file)
+        self.label_map = utils.read_label_map(label_map_file)
         self.converter = tagging_converter.TaggingConverter(
-        tagging_converter.get_phrase_vocabulary_from_label_map(label_map))
+        tagging_converter.get_phrase_vocabulary_from_label_map(self.label_map))
 
         examples = []
 
@@ -179,7 +194,7 @@ class LTDataModule(pl.LightningDataModule):
                 source = source.rstrip('\n')
                 target = target.rstrip('\n')
 
-                labels = self._convert_to_labels(source, target, label_map, 
+                labels = self._convert_to_labels(source, target, 
                     output_arbitrary_targets_for_infeasible_examples)
 
                 if not labels:
@@ -217,9 +232,7 @@ class LTDataModule(pl.LightningDataModule):
             json.dump({"data": examples}, f_out, indent=4)
 
 
-        
-
-    def _convert_to_labels(self, source, target, label_map, output_arbitrary_targets_for_infeasible_examples):
+    def _convert_to_labels(self, source, target, output_arbitrary_targets_for_infeasible_examples):
         task = tagging.EditingTask([source])
         if target is not None:
           tags = self.converter.compute_tags(task, target)
@@ -235,8 +248,8 @@ class LTDataModule(pl.LightningDataModule):
           # If target is not provided, we set all target labels to KEEP.
           tags = [tagging.Tag('KEEP') for _ in task.source_tokens]
 
-        # labels = [label_map[str(tag)] for tag in tags]
-        labels = [str(tag) for tag in tags]
+        labels = [self.label_map[str(tag)] for tag in tags]
+        # labels = [str(tag) for tag in tags]
 
         return labels
 
@@ -250,22 +263,22 @@ class LTDataModule(pl.LightningDataModule):
     
 
 class LaserTagger(pl.LightningModule, FuseModel):
-    def __init__(self):
+    def __init__(self, args):
         super().__init__()
-        # self.bert = BertModel.from_pretrained('bert-base-uncased', output_attentions=True)
+        self.args = args
+        self.model = AutoModel.from_pretrained('bert-base-uncased', output_attentions=True)
         # self.W = nn.Linear(bert.config.hidden_size, 3)
         # self.num_classes = 3
 
 
     def forward(self, **inputs):
-        import pdb; pdb.set_trace()  # breakpoint b7cda139 //
+        import pdb; pdb.set_trace()  # breakpoint a3e7df2a //
         output = self.model(**inputs)
         return output
 
 
-
     def training_step(self, batch, batch_idx):
-        import pdb; pdb.set_trace()  # breakpoint e459cb81 //
+        import pdb; pdb.set_trace()  # breakpoint fa2974e0 //
 
         labels = batch["label"]
         input_ids = batch["input_ids"]
@@ -289,25 +302,32 @@ class LaserTagger(pl.LightningModule, FuseModel):
         return output
 
 
+    def validation_step(self, batch, batch_idx, dataloader_idx=0):
+        import pdb; pdb.set_trace()  # breakpoint 945af7b9 //
+
+        outputs = self(**batch)
+        val_loss, logits = outputs[:2]
+
+        if self.hparams.num_labels >= 1:
+            preds = torch.argmax(logits, axis=1)
+        elif self.hparams.num_labels == 1:
+            preds = logits.squeeze()
+
+        labels = batch["labels"]
+
+        return {'loss': val_loss, "preds": preds, "labels": labels}
+
+
     def configure_optimizers(self):
-        "Prepare optimizer and schedule (linear warmup and decay)"
-        model = self.model
-        no_decay = ["bias", "LayerNorm.weight"]
-        optimizer_grouped_parameters = [
-            {
-                "params": [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)],
-                "weight_decay": self.hparams.weight_decay,
-            },
-            {
-                "params": [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)],
-                "weight_decay": 0.0,
-            },
-        ]
-        optimizer = AdamW(optimizer_grouped_parameters, 
-            lr=self.hparams.learning_rate, eps=self.hparams.adam_epsilon)
+        optimizer = AdamW(self.model.parameters(), 
+            lr=self.args.learning_rate, 
+            eps=self.args.adam_epsilon,
+            betas=(self.args.adam_beta1, self.args.adam_beta2))
 
         scheduler = get_linear_schedule_with_warmup(
-            optimizer, num_warmup_steps=self.hparams.warmup_steps, num_training_steps=self.total_steps
+            optimizer, 
+            num_warmup_steps=self.args.warmup_steps,
+            num_training_steps=self.args.num_train_steps
         )
         scheduler = {
             'scheduler': scheduler,
@@ -315,3 +335,15 @@ class LaserTagger(pl.LightningModule, FuseModel):
             'frequency': 1
         }
         return [optimizer], [scheduler]
+
+    @staticmethod
+    def add_model_specific_args(parent_parser):
+        parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
+        parser.add_argument("--learning_rate", default=2e-5, type=float)
+        parser.add_argument("--adam_epsilon", default=1e-9, type=float)
+        parser.add_argument("--adam_beta1", default=0.9, type=float)
+        parser.add_argument("--adam_beta2", default=0.997, type=float)
+        parser.add_argument("--warmup_steps", default=16000, type=int)
+        parser.add_argument("--label_smoothing", default=0.1, type=float)
+
+        return parser
