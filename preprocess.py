@@ -220,11 +220,11 @@ if __name__ == '__main__':
 
     # Load dataset class by name
     try:
-        dataset_mod = __import__("datasets", fromlist=[args.dataset])
+        dataset_mod = __import__("data", fromlist=[args.dataset])
         dataset_cls = getattr(dataset_mod, args.dataset)
         dataset = dataset_cls()
     except AttributeError as err:
-        logger.error(f"Unknown dataset: '{args.dataset}'. Please create a class '{args.dataset}' in 'datasets.py'.")
+        logger.error(f"Unknown dataset: '{args.dataset}'. Please create a class '{args.dataset}' in 'data.py'.")
         raise err
 
     # Load data
