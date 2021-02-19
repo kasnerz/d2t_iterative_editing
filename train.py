@@ -6,7 +6,7 @@ from model import LaserTagger, LTDataModule
 import logging
 import argparse
 import os
-
+import warnings
 
 import pytorch_lightning as pl
 
@@ -53,14 +53,15 @@ def parse_args(args=None):
 
 if __name__ == '__main__':
     args = parse_args()
-
-
     logger.info("Initializing LaserTagger")
 
     pl.seed_everything(args.seed)
     dm = LTDataModule(args)
     dm.prepare_data()
     dm.setup('fit')
-    model = LaserTagger(args)
-    trainer = pl.Trainer.from_argparse_args(args)
-    trainer.fit(model, dm)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=UserWarning)
+        model = LaserTagger(args)
+        trainer = pl.Trainer.from_argparse_args(args)
+        trainer.fit(model, dm)

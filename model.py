@@ -9,7 +9,7 @@ import json
 import argparse
 import pytorch_lightning as pl
 import torch
-import warnings
+
 from torch.utils.data import DataLoader
 from data import get_dataset_class
 
@@ -22,11 +22,16 @@ from lasertagger import tagging
 from lasertagger import tagging_converter
 from lasertagger import utils
 
+from torch.nn.utils.rnn import pad_sequence
+
+from collections import OrderedDict
 from transformers import (
     AdamW,
     AutoModel,
     AutoConfig,
     AutoTokenizer,
+    BertLMHeadModel,
+    BertForTokenClassification,
     get_linear_schedule_with_warmup,
 )
 
@@ -112,27 +117,40 @@ class LTDataModule(pl.LightningDataModule):
                         'train': os.path.join(exp_output_dir, "train.json")},
             field='data')
 
+
         for split in self.dataset.keys():
             self.dataset[split] = self.dataset[split].map(
                 self._convert_to_features,
                 batched=True,
                 remove_columns=['labels'],
             )
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore", category=UserWarning)
-                self.dataset[split].set_format(type="torch",
-                    columns=["attention_mask", "token_type_ids", "input_ids", "labels"])
+            self.dataset[split].set_format(type="torch",
+                columns=["attention_mask", "token_type_ids", "input_ids", "labels"])
 
+
+    def _pad_sequence(self, batch):
+        batch_collated = {}
+
+        for key in ["labels", "input_ids", "attention_mask", "token_type_ids"]:
+            elems = [x[key] for x in batch]
+            # y_lens = [len(y) for y in yy]
+
+            elems_pad = pad_sequence(elems, batch_first=True, padding_value=0)
+            batch_collated[key] = elems_pad
+            # batch_collated[key]
+
+        return batch_collated
 
     def train_dataloader(self):
-        return DataLoader(self.dataset['train'], batch_size=self.args.batch_size, num_workers=self.args.max_threads)
+        return DataLoader(self.dataset['train'], batch_size=self.args.batch_size, num_workers=self.args.max_threads, collate_fn=self._pad_sequence)
     
 
     def val_dataloader(self):
-        return DataLoader(self.dataset['dev'], batch_size=self.args.batch_size, num_workers=self.args.max_threads)
+        return DataLoader(self.dataset['dev'], batch_size=self.args.batch_size, num_workers=self.args.max_threads, collate_fn=self._pad_sequence)
 
     def test_dataloader(self):
-        return DataLoader(self.dataset['test'], batch_size=self.args.batch_size, num_workers=self.args.max_threads)
+        return DataLoader(self.dataset['test'], batch_size=self.args.batch_size, num_workers=self.args.max_threads, collate_fn=self._pad_sequence)
+
 
 
     def _convert_to_features(self, example_batch, indices=None):
@@ -143,7 +161,7 @@ class LTDataModule(pl.LightningDataModule):
             tokens_batch,
             add_special_tokens=True,
             max_length=self.args.max_length,
-            padding='longest',
+            # padding='longest',
             truncation=True,
             # return_tensors='pt',
             is_split_into_words=True
@@ -234,7 +252,7 @@ class LTDataModule(pl.LightningDataModule):
                     break
 
         with open(output_file, 'w') as f_out:
-            json.dump({"data": examples}, f_out, indent=4)
+            json.dump({"data": examples}, f_out)
 
 
     def _convert_to_labels(self, source, target, output_arbitrary_targets_for_infeasible_examples):
@@ -271,43 +289,34 @@ class LaserTagger(pl.LightningModule, FuseModel):
     def __init__(self, args):
         super().__init__()
         self.args = args
-        self.model = AutoModel.from_pretrained('bert-base-uncased', output_attentions=True)
-        # self.W = nn.Linear(bert.config.hidden_size, 3)
-        # self.num_classes = 3
+        self.model = BertForTokenClassification.from_pretrained('bert-base-uncased', 
+            return_dict=True, 
+            num_labels=self.args.vocab_size*2 + 2) # KEEP / DELETE for each token + standalone
 
 
     def forward(self, **inputs):
-        import pdb; pdb.set_trace()  # breakpoint a3e7df2a //
-        output = self.model(**inputs)
-        return output
+        return self.model(**inputs)
 
 
     def training_step(self, batch, batch_idx):
-        import pdb; pdb.set_trace()  # breakpoint fa2974e0 //
-
-        labels = batch["label"]
+        labels = batch["labels"]
         input_ids = batch["input_ids"]
         attention_mask = batch["attention_mask"]
         token_type_ids = batch["token_type_ids"]
 
-        loss, _ = self.model(
+        outputs = self.model(
                 input_ids,
                 token_type_ids=token_type_ids,
                 attention_mask=attention_mask,
-                labels=labels
-                )
+                labels=labels)
 
-        tqdm_dict = {"train_loss": loss}
-        output = OrderedDict({
-            "loss": loss,
-            "progress_bar": tqdm_dict,
-            "log": tqdm_dict
-            })
+        loss = outputs["loss"]
+        self.log('loss/train', loss, prog_bar=True)
 
-        return output
+        return loss
 
 
-    def validation_step(self, batch, batch_idx, dataloader_idx=0):
+    def validation_step(self, batch, batch_idx):
         labels = batch["labels"]
         input_ids = batch["input_ids"]
         attention_mask = batch["attention_mask"]
@@ -316,12 +325,11 @@ class LaserTagger(pl.LightningModule, FuseModel):
         outputs = self(
             input_ids=input_ids,
             token_type_ids=token_type_ids,
-            attention_mask=attention_mask
+            attention_mask=attention_mask,
+            labels=labels
         )
 
-        import pdb; pdb.set_trace()  # breakpoint 99da852d //
-        val_loss, logits = outputs[:2]
-
+        val_loss, logits = outputs["loss"], outputs["logits"]
         preds = torch.argmax(logits, axis=1)
 
         return {'loss': val_loss, "preds": preds, "labels": labels}
@@ -335,7 +343,7 @@ class LaserTagger(pl.LightningModule, FuseModel):
 
         scheduler = get_linear_schedule_with_warmup(
             optimizer, 
-            num_warmup_steps=self.args.warmup_steps,
+            num_warmup_steps=self.args.num_train_steps * self.args.warmup_proportion,
             num_training_steps=self.args.num_train_steps
         )
         scheduler = {
@@ -352,7 +360,7 @@ class LaserTagger(pl.LightningModule, FuseModel):
         parser.add_argument("--adam_epsilon", default=1e-9, type=float)
         parser.add_argument("--adam_beta1", default=0.9, type=float)
         parser.add_argument("--adam_beta2", default=0.997, type=float)
-        parser.add_argument("--warmup_steps", default=16000, type=int)
+        parser.add_argument("--warmup_proportion", default=0.1, type=float)
         parser.add_argument("--label_smoothing", default=0.1, type=float)
 
         return parser
