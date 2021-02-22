@@ -47,6 +47,8 @@ def parse_args(args=None):
         help="Random seed.")
     parser.add_argument("--max_threads", default=8, type=int,
         help="Maximum number of CPU threads.")
+    parser.add_argument("--accumulate_grad_batches", default=1, type=int,
+            help="Number of batches to accumulate before running the backward pass (efficiently multiplies the batch size).")
     
     return parser.parse_args(args)
 
@@ -63,5 +65,19 @@ if __name__ == '__main__':
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=UserWarning)
         model = LaserTagger(args)
+
+        ckpt_output_dir = os.path.join(args.output_dir,
+            args.experiment,
+            str(args.vocab_size),
+            "model.ckpt"
+        )
+
+        checkpoint_callback = pl.callbacks.ModelCheckpoint(
+            filepath=ckpt_output_dir,
+            save_top_k=1,
+            verbose=True,
+            monitor='val_loss',
+            mode='min'
+        )
         trainer = pl.Trainer.from_argparse_args(args)
         trainer.fit(model, dm)

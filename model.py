@@ -9,12 +9,13 @@ import json
 import argparse
 import pytorch_lightning as pl
 import torch
+import pickle
 
 from torch.utils.data import DataLoader
 from data import get_dataset_class
 
 from collections import defaultdict
-from datasets import load_dataset
+from datasets import load_dataset, dataset_dict, Dataset
 
 from lasertagger import phrase_vocabulary_optimization
 from lasertagger import preprocess_main
@@ -47,6 +48,7 @@ class FLAGS(defaultdict):
         super(FLAGS, self).__init__(None)
         self.__dict__ = self
 
+
 class FuseModel:
     def fuse(self, first, second):
         raise NotImplementedError()
@@ -57,10 +59,10 @@ class LTDataModule(pl.LightningDataModule):
     def __init__(self, args):
         super().__init__()
         self.args = args
-        self.tokenizer = AutoTokenizer.from_pretrained(self.args.model_name, use_fast=True)
 
         # disable the "huggingface/tokenizers: The current process just got forked" warning
         os.environ["TOKENIZERS_PARALLELISM"] = "false"
+        self.tokenizer = AutoTokenizer.from_pretrained(self.args.model_name, use_fast=True)
 
         
     def prepare_data(self):
@@ -82,6 +84,8 @@ class LTDataModule(pl.LightningDataModule):
         os.makedirs(exp_output_dir, exist_ok=True)
 
         if not (self.args.train_only or self.args.export_only):
+
+            logger.info("Building vocabulary and computing labels (this step can be skipped using the --train_only flag)")
             # self._phrase_vocabulary_optimization(
             #     dataset_dir=self.dataset_dir,
             #     vocab_size=self.args.vocab_size,
@@ -91,14 +95,6 @@ class LTDataModule(pl.LightningDataModule):
             # )
 
             self._build_examples(
-                split="dev",
-                dataset_dir=self.dataset_dir,
-                exp_output_dir=exp_output_dir,
-                max_input_examples=None,
-                output_arbitrary_targets_for_infeasible_examples=True
-            )
-
-            self._build_examples(
                 split="train",
                 dataset_dir=self.dataset_dir,
                 exp_output_dir=exp_output_dir,
@@ -106,16 +102,31 @@ class LTDataModule(pl.LightningDataModule):
                 output_arbitrary_targets_for_infeasible_examples=False
             )
 
+            self._build_examples(
+                split="dev",
+                dataset_dir=self.dataset_dir,
+                exp_output_dir=exp_output_dir,
+                max_input_examples=None,
+                output_arbitrary_targets_for_infeasible_examples=True
+            )
+
+
     def setup(self, stage):
         exp_output_dir = os.path.join(self.args.output_dir,
             self.args.experiment,
             str(self.args.vocab_size),
         )
 
-        self.dataset = load_dataset('json', 
-            data_files={'dev': os.path.join(exp_output_dir, "dev.json"), 
-                        'train': os.path.join(exp_output_dir, "train.json")},
-            field='data')
+        with open(os.path.join(exp_output_dir, "dev.bin"), 'rb') as f_in:
+            dev = pickle.load(f_in)
+
+        with open(os.path.join(exp_output_dir, "train.bin"), 'rb') as f_in:
+            train = pickle.load(f_in)
+
+        self.dataset = dataset_dict.DatasetDict({
+            "dev" : Dataset.from_dict(dev),
+            "train" : Dataset.from_dict(train)
+        })
 
 
         for split in self.dataset.keys():
@@ -133,24 +144,19 @@ class LTDataModule(pl.LightningDataModule):
 
         for key in ["labels", "input_ids", "attention_mask", "token_type_ids"]:
             elems = [x[key] for x in batch]
-            # y_lens = [len(y) for y in yy]
-
             elems_pad = pad_sequence(elems, batch_first=True, padding_value=0)
             batch_collated[key] = elems_pad
-            # batch_collated[key]
 
         return batch_collated
 
     def train_dataloader(self):
         return DataLoader(self.dataset['train'], batch_size=self.args.batch_size, num_workers=self.args.max_threads, collate_fn=self._pad_sequence)
-    
 
     def val_dataloader(self):
         return DataLoader(self.dataset['dev'], batch_size=self.args.batch_size, num_workers=self.args.max_threads, collate_fn=self._pad_sequence)
 
     def test_dataloader(self):
         return DataLoader(self.dataset['test'], batch_size=self.args.batch_size, num_workers=self.args.max_threads, collate_fn=self._pad_sequence)
-
 
 
     def _convert_to_features(self, example_batch, indices=None):
@@ -161,9 +167,7 @@ class LTDataModule(pl.LightningDataModule):
             tokens_batch,
             add_special_tokens=True,
             max_length=self.args.max_length,
-            # padding='longest',
             truncation=True,
-            # return_tensors='pt',
             is_split_into_words=True
         )
         features['labels'] = self._align_labels_with_tokens(features, example_batch['labels'])
@@ -204,13 +208,18 @@ class LTDataModule(pl.LightningDataModule):
     def _build_examples(self, split, dataset_dir, exp_output_dir, max_input_examples, output_arbitrary_targets_for_infeasible_examples):
         label_map_file = os.path.join(exp_output_dir, "label_map.txt")
         input_file = os.path.join(dataset_dir, split)
-        output_file = os.path.join(exp_output_dir, f"{split}.json")
+        output_file = os.path.join(exp_output_dir, f"{split}.bin")
 
         self.label_map = utils.read_label_map(label_map_file)
         self.converter = tagging_converter.TaggingConverter(
         tagging_converter.get_phrase_vocabulary_from_label_map(self.label_map))
 
-        examples = []
+        examples = {
+            "text": [],
+            "labels": []
+        }
+
+        logger.info(f"Processing {split} dataset")
 
         with open(f"{input_file}.in") as f_in, open(f"{input_file}.ref") as f_ref:
             for i, (source, target) in enumerate(zip(f_in, f_ref)):
@@ -220,39 +229,20 @@ class LTDataModule(pl.LightningDataModule):
                 labels = self._convert_to_labels(source, target, 
                     output_arbitrary_targets_for_infeasible_examples)
 
+                if i % 10000 == 0:
+                    logger.info(f"{i} examples processed")
+
                 if not labels:
                     continue
 
-                # tokens = self._truncate_list(tokens)
-                # labels = self._truncate_list(labels)
-
-                # tokens = self.tokenizer.encode_pls
-                # # TODO no manual prepend of flags
-                # input_tokens = ['[CLS]'] + tokens + ['[SEP]']
-                # labels_mask = [0] + [1] * len(labels) + [0]
-                # labels = [0] + labels + [0]
-                # input_mask = [1] * len(input_tokens)
-                # segment_ids = [0] * len(input_tokens)
-
-                # example = {
-                #     "input_tokens" : input_tokens,
-                #     "labels_mask" : labels_mask,
-                #     "labels" : labels,
-                #     "input_mask" : input_mask,
-                #     "segment_ids" : segment_ids
-                # }
-
-                example = {
-                    "text" : source,
-                    "labels" : labels
-                }
-                examples.append(example)
+                examples["text"].append(source)
+                examples["labels"].append(labels)
 
                 if max_input_examples is not None and i > max_input_examples:
                     break
 
-        with open(output_file, 'w') as f_out:
-            json.dump({"data": examples}, f_out)
+        with open(output_file, 'wb') as f_out:
+            pickle.dump(examples, f_out, protocol=4)
 
 
     def _convert_to_labels(self, source, target, output_arbitrary_targets_for_infeasible_examples):
@@ -272,20 +262,12 @@ class LTDataModule(pl.LightningDataModule):
           tags = [tagging.Tag('KEEP') for _ in task.source_tokens]
 
         labels = [self.label_map[str(tag)] for tag in tags]
-        # labels = [str(tag) for tag in tags]
 
         return labels
 
-    # def _truncate_list(self, x):
-    #   """Returns truncated version of x according to the self._max_seq_length."""
-    #   # Save two slots for the first [CLS] token and the last [SEP] token.
-    #   return x[:self._max_seq_length - 2]
-
-
-
     
 
-class LaserTagger(pl.LightningModule, FuseModel):
+class LaserTagger(pl.LightningModule):
     def __init__(self, args):
         super().__init__()
         self.args = args
@@ -322,7 +304,7 @@ class LaserTagger(pl.LightningModule, FuseModel):
         attention_mask = batch["attention_mask"]
         token_type_ids = batch["token_type_ids"]
 
-        outputs = self(
+        outputs = self.model(
             input_ids=input_ids,
             token_type_ids=token_type_ids,
             attention_mask=attention_mask,
@@ -364,3 +346,18 @@ class LaserTagger(pl.LightningModule, FuseModel):
         parser.add_argument("--label_smoothing", default=0.1, type=float)
 
         return parser
+
+
+
+class LTFuseModel(FuseModel):
+    def __init__(self, args):
+        self.model = LaserTagger.load_from_checkpoint(checkpoint_path=args.model_path + "model.ckpt")
+        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_fast=True)
+
+    def fuse(self, first, second):
+        sentence = " ".join([first, second])
+
+        inputs = self.tokenizer.encode_plus(sentence, return_tensors="pt")
+        predictions = self.model(**inputs)[0]
+
+        import pdb; pdb.set_trace()  # breakpoint ad3aafd2 //
