@@ -5,12 +5,11 @@ import logging
 import numpy as np
 import os
 import re
-import tensorflow as tf
 import torch
 
 from utils.sentence_scorer import SentenceScorer
 from utils.tokenizer import Tokenizer
-from model_tf import LaserTaggerTF
+from model import LTFuseModel
 
 
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO, datefmt='%H:%M:%S')
@@ -94,58 +93,74 @@ class IncrementalDecoder:
 
 
     def _decode_entry(self, dataset, entry):
-        triples = entry.triples
-
-        facts = []
-        logger.info(triples)
-        logger.info(f"Step #0")
-
-        current_text = None
-
-        if dataset.name == "e2e" and self.use_e2e_double_templates and len(triples) > 1:
-            current_text, used_triples, additional_triples = self._triple_to_template_double(dataset, triples)
-
-        if not current_text:
-            current_text = self._triple_to_template(dataset, triples[0])
-            used_triples = [triples[0]]
-            additional_triples = triples[1:]
-
-        logger.info(f"{current_text}")
-        facts += used_triples
-
-        for step, triple in enumerate(additional_triples):
-            logger.info(f"Step #{step+1}")
-
-            template = self._triple_to_template(dataset, triple)
-            facts.append(triple)
-
-            beam = self.fuse_model.fuse(current_text, template)
-            beam = self._filter_beam(beam, facts, dataset)
-
-            if beam:
-                logger.info(f"{len(beam)} sentences left in beam")
-                current_text = self.sentence_scorer.select_best(beam)
-            else:
-                logger.info("Beam empty, using fallback")
-                current_text = " ".join([current_text, template])
-
-            logger.info(f"{current_text}")
+        logger.info(entry[0])
+        logger.info(entry[1])
+        res = self.fuse_model.fuse(entry[0], None)
+        logger.info(res)
 
         if self.export_file_handle:
-            self.export_file_handle.write(self.tokenizer.detokenize(current_text) + "\n")
+            self.export_file_handle.write("\t".join([self.tokenizer.detokenize(entry[0]), self.tokenizer.detokenize(res), self.tokenizer.detokenize(entry[1])]) + "\n")
 
-        logger.info("=========================")
+        logger.info("=================")
+        # triples = entry.triples
+
+        # if len(triples) == 1:
+        #     return #TODO debug
+
+        # facts = []
+        # logger.info(triples)
+        # logger.info(f"Step #0")
+
+        # current_text = None
+
+        # if dataset.name == "e2e" and self.use_e2e_double_templates and len(triples) > 1:
+        #     current_text, used_triples, additional_triples = self._triple_to_template_double(dataset, triples)
+
+        # if not current_text:
+        #     current_text = self._triple_to_template(dataset, triples[0])
+        #     used_triples = [triples[0]]
+        #     additional_triples = triples[1:]
+
+        # logger.info(f"{current_text}")
+        # facts += used_triples
+
+        # for step, triple in enumerate(additional_triples):
+        #     logger.info(f"Step #{step+1}")
+
+        #     template = self._triple_to_template(dataset, triple)
+        #     facts.append(triple)
+
+        #     beam = self.fuse_model.fuse(current_text, template)
+        #     current_text = beam            
+        #     # beam = self._filter_beam(beam, facts, dataset)
+
+        #     # if beam:
+        #     #     logger.info(f"{len(beam)} sentences left in beam")
+        #     #     current_text = self.sentence_scorer.select_best(beam)
+        #     # else:
+        #     #     logger.info("Beam empty, using fallback")
+        #     #     current_text = " ".join([current_text, template])
+
+        #     logger.info(f"{current_text}")
+
+        # if self.export_file_handle:
+        #     self.export_file_handle.write(self.tokenizer.detokenize(current_text) + "\n")
+
+        # logger.info("=========================")
 
 
     def decode(self, dataset, split):
         for i, entry in enumerate(dataset.data[split]):
             logger.info(f"Example {i}")
-            logger.info(f"-------------"
+            logger.info(f"-------------")
+
             self._decode_entry(dataset, entry)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument("--model_name", type=str, default="bert-base-cased",
+        help="Name of the model from the Huggingface Transformers library.")
     parser.add_argument("--exp_dir", default="experiments", type=str,
         help="Base directory of the experiment.")
     parser.add_argument("--dataset", type=str, required=True,
@@ -156,8 +171,8 @@ if __name__ == "__main__":
         help="Experiment name.")
     parser.add_argument('--splits', type=str, nargs='+', default=["dev"],
         help='Splits to load and decode (e.g. dev test)')
-    parser.add_argument("--bert_base_dir", type=str, default="lasertagger_tf/bert/cased_L-12_H-768_A-12",
-        help="Base directory with the BERT pretrained model")
+    # parser.add_argument("--bert_base_dir", type=str, default="lasertagger_tf/bert/cased_L-12_H-768_A-12",
+    #     help="Base directory with the BERT pretrained model")
     parser.add_argument("--max_seq_length", default=128, type=int,
         help="Maximum sequence length.")
     parser.add_argument("--is_uncased", default=False, action='store_true',
@@ -181,7 +196,7 @@ if __name__ == "__main__":
     logger.info(args)
 
     torch.manual_seed(args.seed)
-    tf.random.set_random_seed(args.seed)
+    # tf.random.set_random_seed(args.seed)
     np.random.seed(args.seed)
 
     lms_device = 'cuda' if args.lms_device == 'gpu' else 'cpu'
@@ -201,25 +216,26 @@ if __name__ == "__main__":
 
     dataset.load_from_dir(args.dataset_dir, args.splits)
 
-    tf.config.threading.set_inter_op_parallelism_threads(args.max_threads)
+    # tf.config.threading.set_inter_op_parallelism_threads(args.max_threads)
     torch.set_num_threads(args.max_threads)
 
     for split in args.splits:
+
+        # label_map_file = os.path.join(args.exp_dir, args.experiment, args.vocab_size, "label_map.txt")
+        # vocab_file = os.path.join(args.bert_base_dir, "vocab.txt")
+        model_path = os.path.join(args.exp_dir, args.experiment, args.vocab_size)
+        fuse_model = LTFuseModel(args, model_path=model_path, model_name=args.model_name)
+
         if args.no_export:
             export_file_handle = None
         else:
-            os.makedirs("out", exist_ok=True)
-            out_filename = f"{args.experiment}_{args.vocab_size}_{split}.hyp"
-            export_file_handle = open(os.path.join("out", out_filename), "w")
+            # os.makedirs("out", exist_ok=True)
+            # out_filename = f"{args.experiment}_{args.vocab_size}_{split}.hyp"
+            out_filename = f"{split}.tsv"
+            export_file_handle = open(os.path.join(model_path, out_filename), "w")
 
-        fuse_model = LaserTaggerTF()
-
-        label_map_file = os.path.join(args.exp_dir, args.experiment, args.vocab_size, "label_map.txt")
-        vocab_file = os.path.join(args.bert_base_dir, "vocab.txt")
-        model_path = os.path.join(args.exp_dir, args.experiment, args.vocab_size, "models", "export")
-
-        fuse_model.predict(label_map_file=label_map_file, vocab_file=vocab_file, model_path=model_path,
-                            is_uncased=args.is_uncased, max_seq_length=args.max_seq_length)
+        # fuse_model.predict(label_map_file=label_map_file, vocab_file=vocab_file, model_path=model_path,
+        #                     is_uncased=args.is_uncased, max_seq_length=args.max_seq_length)
 
 
         decoder = IncrementalDecoder(fuse_model, lms_device=lms_device,

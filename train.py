@@ -35,20 +35,20 @@ def parse_args(args=None):
         help="Experiment name used for naming the experiment directory")
     parser.add_argument("--max_input_examples", type=int, default=1000000,
         help="Maximum number of training examples to preprocess")
-    parser.add_argument("--num_train_steps", type=int, default=10000,
-        help="Number of training steps (set e.g. to 100 for testing)")
+    # parser.add_argument("--num_train_steps", type=int, default=10000,
+    #     help="Number of training steps (set e.g. to 100 for testing)")
     parser.add_argument("--max_length", type=int, default=256,
         help="Maximum number of tokens per example")
     parser.add_argument("--train_only", action="store_true",
         help="Skip phrase vocabulary optimization, converting text to tags and exporting the model")
     parser.add_argument("--export_only", action="store_true",
-        help="Skip phrase vocabulary optimization, converting text to tags and training the model")
+        help="Skip phrase vocabulary optimization, converting text to tags and training the model (TF only)")
+    parser.add_argument("--enable_swap_tag", action="store_true",
+        help="Enable LaserTagger SWAP tag for swapping sentences")
     parser.add_argument("--seed", default=42, type=int,
         help="Random seed.")
     parser.add_argument("--max_threads", default=8, type=int,
         help="Maximum number of CPU threads.")
-    parser.add_argument("--accumulate_grad_batches", default=1, type=int,
-            help="Number of batches to accumulate before running the backward pass (efficiently multiplies the batch size).")
     
     return parser.parse_args(args)
 
@@ -62,22 +62,25 @@ if __name__ == '__main__':
     dm.prepare_data()
     dm.setup('fit')
 
+    # disable " UserWarning: The given NumPy array is not writeable, and PyTorch does not support non-writeable tensors."
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=UserWarning)
         model = LaserTagger(args)
 
         ckpt_output_dir = os.path.join(args.output_dir,
             args.experiment,
-            str(args.vocab_size),
-            "model.ckpt"
+            str(args.vocab_size)
         )
 
         checkpoint_callback = pl.callbacks.ModelCheckpoint(
-            filepath=ckpt_output_dir,
+            dirpath=ckpt_output_dir,
+            filename='model',
             save_top_k=1,
             verbose=True,
-            monitor='val_loss',
+            monitor='loss/val',
             mode='min'
         )
-        trainer = pl.Trainer.from_argparse_args(args)
+
+        trainer = pl.Trainer.from_argparse_args(args, 
+            callbacks=[checkpoint_callback])
         trainer.fit(model, dm)
