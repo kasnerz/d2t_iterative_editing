@@ -37,7 +37,7 @@ def parse_args(args=None):
         help="Maximum number of training examples to preprocess")
     # parser.add_argument("--num_train_steps", type=int, default=10000,
     #     help="Number of training steps (set e.g. to 100 for testing)")
-    parser.add_argument("--max_length", type=int, default=256,
+    parser.add_argument("--max_length", type=int, default=128,
         help="Maximum number of tokens per example")
     parser.add_argument("--train_only", action="store_true",
         help="Skip phrase vocabulary optimization, converting text to tags and exporting the model")

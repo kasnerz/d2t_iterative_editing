@@ -480,17 +480,22 @@ class DiscoFuse(Dataset):
 
                     disco_type = cols[4]
                     connective = cols[5]
+                    
+                    # TODO debug only!!
+                    src = " ".join(cols[2:4])
+                    tgt = " ".join(cols[0:2])
+                    self.data[split].append((src, tgt))
 
-                    if disco_type in ["PAIR_ANAPHORA", "SINGLE_APPOSITION", "SINGLE_RELATIVE", "PAIR_NONE"] \
-                        or (disco_type in ["SINGLE_S_COORD", "SINGLE_S_COORD_ANAPHORA", "SINGLE_VP_COORD"]
-                            and connective in ["and", ", and"]):
-                        src = " ".join(cols[2:4])
-                        tgt = " ".join(cols[0:2])
+                    # if disco_type in ["PAIR_ANAPHORA", "SINGLE_APPOSITION", "SINGLE_RELATIVE", "PAIR_NONE"] \
+                        # or (disco_type in ["SINGLE_S_COORD", "SINGLE_S_COORD_ANAPHORA", "SINGLE_VP_COORD"]
+                            # and connective in ["and", ", and"]):
+                        # src = " ".join(cols[2:4])
+                        # tgt = " ".join(cols[0:2])
 
-                        self.data[split].append((src, tgt))
-                        selected += 1
-                    else:
-                        skipped += 1
+                        # self.data[split].append((src, tgt))
+                        # selected += 1
+                    # else:
+                        # skipped += 1
 
                 logger.info(f"{split} processed: {selected} selected, {skipped} skipped")
 

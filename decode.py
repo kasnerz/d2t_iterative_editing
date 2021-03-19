@@ -93,60 +93,59 @@ class IncrementalDecoder:
 
 
     def _decode_entry(self, dataset, entry):
-        logger.info(entry[0])
-        logger.info(entry[1])
-        res = self.fuse_model.fuse(entry[0], None)
-        logger.info(res)
-
-        if self.export_file_handle:
-            self.export_file_handle.write("\t".join([self.tokenizer.detokenize(entry[0]), self.tokenizer.detokenize(res), self.tokenizer.detokenize(entry[1])]) + "\n")
-
-        logger.info("=================")
-        # triples = entry.triples
-
-        # if len(triples) == 1:
-        #     return #TODO debug
-
-        # facts = []
-        # logger.info(triples)
-        # logger.info(f"Step #0")
-
-        # current_text = None
-
-        # if dataset.name == "e2e" and self.use_e2e_double_templates and len(triples) > 1:
-        #     current_text, used_triples, additional_triples = self._triple_to_template_double(dataset, triples)
-
-        # if not current_text:
-        #     current_text = self._triple_to_template(dataset, triples[0])
-        #     used_triples = [triples[0]]
-        #     additional_triples = triples[1:]
-
-        # logger.info(f"{current_text}")
-        # facts += used_triples
-
-        # for step, triple in enumerate(additional_triples):
-        #     logger.info(f"Step #{step+1}")
-
-        #     template = self._triple_to_template(dataset, triple)
-        #     facts.append(triple)
-
-        #     beam = self.fuse_model.fuse(current_text, template)
-        #     current_text = beam            
-        #     # beam = self._filter_beam(beam, facts, dataset)
-
-        #     # if beam:
-        #     #     logger.info(f"{len(beam)} sentences left in beam")
-        #     #     current_text = self.sentence_scorer.select_best(beam)
-        #     # else:
-        #     #     logger.info("Beam empty, using fallback")
-        #     #     current_text = " ".join([current_text, template])
-
-        #     logger.info(f"{current_text}")
+        # logger.info(entry[0])
+        # logger.info(entry[1])
+        # res = self.fuse_model.fuse(entry[0], None)
+        # logger.info(res)
 
         # if self.export_file_handle:
-        #     self.export_file_handle.write(self.tokenizer.detokenize(current_text) + "\n")
+            # self.export_file_handle.write("\t".join([self.tokenizer.detokenize(entry[0]), self.tokenizer.detokenize(res), self.tokenizer.detokenize(entry[1])]) + "\n")
 
-        # logger.info("=========================")
+        # logger.info("=================")
+        triples = entry.triples
+
+        # if len(triples) == 1:
+        #    return #TODO debug
+
+        facts = []
+        logger.info(triples)
+        logger.info(f"Step #0")
+
+        current_text = None
+
+        if dataset.name == "e2e" and self.use_e2e_double_templates and len(triples) > 1:
+            current_text, used_triples, additional_triples = self._triple_to_template_double(dataset, triples)
+
+        if not current_text:
+            current_text = self._triple_to_template(dataset, triples[0])
+            used_triples = [triples[0]]
+            additional_triples = triples[1:]
+
+        logger.info(f"{current_text}")
+        facts += used_triples
+
+        for step, triple in enumerate(additional_triples):
+            logger.info(f"Step #{step+1}")
+
+            template = self._triple_to_template(dataset, triple)
+            facts.append(triple)
+
+            beam = self.fuse_model.fuse(current_text, template)
+            beam = self._filter_beam(beam, facts, dataset)
+
+            if beam:
+                logger.info(f"{len(beam)} sentences left in beam")
+                current_text = self.sentence_scorer.select_best(beam)
+            else:
+                logger.info("Beam empty, using fallback")
+                current_text = " ".join([current_text, template])
+
+            logger.info(f"{current_text}")
+
+        if self.export_file_handle:
+            self.export_file_handle.write(self.tokenizer.detokenize(current_text) + "\n")
+
+        logger.info("=========================")
 
 
     def decode(self, dataset, split):
