@@ -170,8 +170,6 @@ if __name__ == "__main__":
         help="Experiment name.")
     parser.add_argument('--splits', type=str, nargs='+', default=["dev"],
         help='Splits to load and decode (e.g. dev test)')
-    # parser.add_argument("--bert_base_dir", type=str, default="lasertagger_tf/bert/cased_L-12_H-768_A-12",
-    #     help="Base directory with the BERT pretrained model")
     parser.add_argument("--max_seq_length", default=128, type=int,
         help="Maximum sequence length.")
     parser.add_argument("--is_uncased", default=False, action='store_true',
@@ -195,7 +193,6 @@ if __name__ == "__main__":
     logger.info(args)
 
     torch.manual_seed(args.seed)
-    # tf.random.set_random_seed(args.seed)
     np.random.seed(args.seed)
 
     lms_device = 'cuda' if args.lms_device == 'gpu' else 'cpu'
@@ -212,29 +209,19 @@ if __name__ == "__main__":
 
     template_dir = os.path.join("data", dataset.name)
     dataset.load_templates(template_dir)
-
     dataset.load_from_dir(args.dataset_dir, args.splits)
 
-    # tf.config.threading.set_inter_op_parallelism_threads(args.max_threads)
     torch.set_num_threads(args.max_threads)
 
     for split in args.splits:
-
-        # label_map_file = os.path.join(args.exp_dir, args.experiment, args.vocab_size, "label_map.txt")
-        # vocab_file = os.path.join(args.bert_base_dir, "vocab.txt")
         model_path = os.path.join(args.exp_dir, args.experiment, args.vocab_size)
         fuse_model = LTFuseModel(args, model_path=model_path, model_name=args.model_name)
 
         if args.no_export:
             export_file_handle = None
         else:
-            # os.makedirs("out", exist_ok=True)
-            # out_filename = f"{args.experiment}_{args.vocab_size}_{split}.hyp"
-            out_filename = f"{split}.tsv"
+            out_filename = f"{split}.hyp"
             export_file_handle = open(os.path.join(model_path, out_filename), "w")
-
-        # fuse_model.predict(label_map_file=label_map_file, vocab_file=vocab_file, model_path=model_path,
-        #                     is_uncased=args.is_uncased, max_seq_length=args.max_seq_length)
 
 
         decoder = IncrementalDecoder(fuse_model, lms_device=lms_device,

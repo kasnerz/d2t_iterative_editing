@@ -6,6 +6,12 @@ A description of the method can be found in:
 
  > Zdeněk Kasner & Ondřej Dušek (2020): [Data-to-Text Generation with Iterative Text Editing.](https://www.aclweb.org/anthology/2020.inlg-1.9/) In: *Proceedings of the 13th International Conference on Natural Language Generation (INLG 2020)*.
 
+## Implementation Notes
+This is an **alternative implementation** of the method based on **pyTorch Lightning**. It is meant to be more flexible and extensible, allowing to use the full potential of the [🤗 Transformers](https://huggingface.co/transformers) library. However, it is not well-tested yet, use it at your own risk.
+![lightning](lightning.png)
+
+If you aim to **replicate original experiments**, please refer to the [main branch](/kasnerz/d2t_iterative_editing/tree/main) which uses the original implementation of LaserTagger in Tensorflow 1.15.
+
 ## Model Overview
 ![overview](model.png)
 
@@ -29,18 +35,15 @@ pip install -r requirements.txt
 ### Requirements
 - Python 3 & pip
 - packages
-  - Tensorflow 1.15* (GPU version recommended)
-  - PyTorch 🤗 Transformers
+  - torch 1.7.1
+  - pytorch-lightning 1.0.7
+  - 🤗 Transformers
   - see `requirements.txt` for the full list
 
 All packages can be installed using
 ```bash
 pip install -r requirements.txt
 ```
-Select `tensorflow-1.15` instead of `tensorflow-1.15-gpu` if you wish not to use the GPU.
-
-
-**The original implementation of LaserTagger based on BERT and Tensorflow 1.x was used in the experiments. Implementation of the PyTorch version of LaserTagger is currently in progress.*
 
 ### Dependencies
 All datasets and models can be downloaded using the command: 
@@ -56,12 +59,8 @@ The following lists the dependencies (datasets, models and external repositiorie
 - [DiscoFuse dataset](https://github.com/google-research-datasets/discofuse) (Wikipedia part)
 
 #### External Repositories
-- [LaserTagger](https://github.com/kasnerz/lasertagger) - fork of the original LaserTagger implementation featuring a few changes necessary for integration with the model
-- [E2E Metrics](https://github.com/tuetschek/e2e-metrics) - a set of evaluation metrics used in the E2E Challenge
 
-#### Models
-- [BERT](https://github.com/google-research/bert) - original TensorFlow implementation from Google (utilized by [LaserTagger](https://github.com/google-research/lasertagger))
-- (+ [LMScorer](https://github.com/simonepri/lm-scorer) requires [GPT-2](https://huggingface.co/transformers/model_doc/gpt2.html); downloaded automatically by the `transformers` package)
+- [E2E Metrics](https://github.com/tuetschek/e2e-metrics) - a set of evaluation metrics used in the E2E Challenge
 
 ### Pipeline Overview
 The pipeline involves four steps:
@@ -117,11 +116,8 @@ python3 train.py \
 
 Things you may want to consider:
 - The size of the vocabulary determines the number of phrases used by LaserTagger (see the paper for details). The value 100 was used in the final experiments. 
-- The wrapper for LaserTagger is implemented in `model_tf.py`. The wrapper calls the methods from the LaserTagger repository (directory `lasertagger_tf`) similarly to the original implementation.
-  - *This is a temporary solution: we are working on implementing a custom PyTorch version of LaserTagger, which should be more clear and flexible.*
 - For debugging, the number of training steps can be lowered e.g. to 100.
-- Parameters `--train_only` and `--export_only` can be used to skip other pipeline phases.
-- If you have the correct Tensorflow version (`tensorflow-1.15-gpu`) but a GPU is not used, check if CUDA libraries were linked correctly.
+- The parameter `--train_only` can be used to skip optimizing the vocabulary and building the examples (which has to be done only once before the training).
 
 ### Decoding
 Once the model is trained, the decoding algorithm is used to generate text from RDF triples. See the top figure and/or the paper for the details on the method.
@@ -139,7 +135,7 @@ python3 decode.py \
 
 Things you may want to consider:
 - Decoding will be faster if the LMScorer is allowed to run on GPU (`--lms_device gpu`). Note however this may require a secondary GPU if the GPU is already used for LaserTagger.
-- Output will be stored as `out/<experiment>_<vocab_size>_<split>.hyp`.
+- Output will be stored as `<experiment_dir>/<split>.hyp`.
 - Use the flag `--use_e2e_double_templates` for bootstrapping the decoding process from the templates for pairs of triples in the case of the E2E dataset. The templates for single triples (handcrafted for E2E) are used otherwise.
 - Use the flag `--no_export` in order to suppress saving the output to the `out` directory.
 
@@ -150,7 +146,7 @@ Example of using the evaluation script:
 ```bash
 python3 evaluate.py \
     --ref_file "data/webnlg/ref/test.ref" \
-    --hyp_file "out/webnlg_full_100_test.hyp" \
+    --hyp_file "experiments/test.hyp" \
     --lowercase
 ```
 
