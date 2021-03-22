@@ -7,10 +7,15 @@ A description of the method can be found in:
  > Zdeněk Kasner & Ondřej Dušek (2020): [Data-to-Text Generation with Iterative Text Editing.](https://www.aclweb.org/anthology/2020.inlg-1.9/) In: *Proceedings of the 13th International Conference on Natural Language Generation (INLG 2020)*.
 
 ## Implementation Notes
-This is an **alternative implementation** of the method based on **pyTorch Lightning**. It is meant to be more flexible and extensible, allowing to use the full potential of the [🤗 Transformers](https://huggingface.co/transformers) library. However, it is not well-tested yet, use it at your own risk.
-![lightning](lightning.png)
+This is an **alternative implementation** of the method based on **pyTorch Lightning**. It contains fragments from the original implementation of LaserTagger (e.g. the code for computing the vocabulary), but it does **not require** Tensorflow.
 
-If you aim to **replicate original experiments**, please refer to the [main branch](/kasnerz/d2t_iterative_editing/tree/main) which uses the original implementation of LaserTagger in Tensorflow 1.15.
+The implementation is meant to be more flexible, allowing to use the full potential of the [🤗 Transformers](https://huggingface.co/transformers) library.
+
+<p align="center">
+  <img src="lightning.png" width=500px />
+</p>
+
+If you aim to **replicate original experiments**, please refer to the [main branch](https://github.com/kasnerz/d2t_iterative_editing/tree/main) which uses the original implementation of LaserTagger in Tensorflow 1.15.
 
 ## Model Overview
 ![overview](model.png)
