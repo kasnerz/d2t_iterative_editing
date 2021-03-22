@@ -24,6 +24,18 @@ pip install -r requirements.txt
 ./run.sh webnlg
 ```
 
+## Implementation notes
+<p align="center"> <img src="tf1-logo.png" width=40px/> </p>
+
+This branch contains the code for replicating the experiments described in the paper. The code works with the original implementation of LaserTagger and BERT in **Tensorflow 1.15**. However, the implementation is now somehow obsolete and less flexible.
+
+
+<p align="center"> <img src="pl-logo.png" width=40px/> </p>
+
+If you wish to extend this implementation, you may be interested in the version implemented in **PyTorch Lightning**, which is being developed in the **[torch](https://github.com/kasnerz/d2t_iterative_editing/tree/torch)** branch.
+
+
+
 ## Usage Instructions
 
 ### Requirements
@@ -39,8 +51,6 @@ pip install -r requirements.txt
 ```
 Select `tensorflow-1.15` instead of `tensorflow-1.15-gpu` if you wish not to use the GPU.
 
-
-**The original implementation of LaserTagger based on BERT and Tensorflow 1.x was used in the experiments. Implementation of the PyTorch version of LaserTagger is currently in progress.*
 
 ### Dependencies
 All datasets and models can be downloaded using the command: 
@@ -118,7 +128,6 @@ python3 train.py \
 Things you may want to consider:
 - The size of the vocabulary determines the number of phrases used by LaserTagger (see the paper for details). The value 100 was used in the final experiments. 
 - The wrapper for LaserTagger is implemented in `model_tf.py`. The wrapper calls the methods from the LaserTagger repository (directory `lasertagger_tf`) similarly to the original implementation.
-  - *This is a temporary solution: we are working on implementing a custom PyTorch version of LaserTagger, which should be more clear and flexible.*
 - For debugging, the number of training steps can be lowered e.g. to 100.
 - Parameters `--train_only` and `--export_only` can be used to skip other pipeline phases.
 - If you have the correct Tensorflow version (`tensorflow-1.15-gpu`) but a GPU is not used, check if CUDA libraries were linked correctly.
