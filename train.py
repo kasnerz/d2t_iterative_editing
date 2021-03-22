@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-# from model_tf import LaserTaggerTF
 from model import LaserTagger, LTDataModule
 
 import logging
@@ -35,14 +34,10 @@ def parse_args(args=None):
         help="Experiment name used for naming the experiment directory")
     parser.add_argument("--max_input_examples", type=int, default=1000000,
         help="Maximum number of training examples to preprocess")
-    # parser.add_argument("--num_train_steps", type=int, default=10000,
-    #     help="Number of training steps (set e.g. to 100 for testing)")
     parser.add_argument("--max_length", type=int, default=128,
         help="Maximum number of tokens per example")
     parser.add_argument("--train_only", action="store_true",
         help="Skip phrase vocabulary optimization, converting text to tags and exporting the model")
-    parser.add_argument("--export_only", action="store_true",
-        help="Skip phrase vocabulary optimization, converting text to tags and training the model (TF only)")
     parser.add_argument("--enable_swap_tag", action="store_true",
         help="Enable LaserTagger SWAP tag for swapping sentences")
     parser.add_argument("--seed", default=42, type=int,
@@ -71,7 +66,6 @@ if __name__ == '__main__':
             args.experiment,
             str(args.vocab_size)
         )
-
         checkpoint_callback = pl.callbacks.ModelCheckpoint(
             dirpath=ckpt_output_dir,
             filename='model',
@@ -80,7 +74,6 @@ if __name__ == '__main__':
             monitor='loss/val',
             mode='min'
         )
-
         trainer = pl.Trainer.from_argparse_args(args, 
             callbacks=[checkpoint_callback])
         trainer.fit(model, dm)

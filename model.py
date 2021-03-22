@@ -33,9 +33,6 @@ from transformers import (
     AutoModel,
     AutoConfig,
     AutoTokenizer,
-    BertModel,
-    BertLMHeadModel,
-    BertForTokenClassification,
     get_linear_schedule_with_warmup,
 )
 
@@ -210,7 +207,6 @@ class LTDataModule(pl.LightningDataModule):
                                         experiment_name, enable_swap_tag):
         flags = FLAGS()
         
-        #TODO set back to "train"
         flags.input_file = os.path.join(dataset_dir, "train")
         flags.input_format = "fuse"
         flags.vocabulary_size = vocab_size
@@ -341,7 +337,7 @@ class LaserTagger(pl.LightningModule):
         if self.args.enable_swap_tag:
             self.num_labels+=1
 
-        self.bert = BertModel.from_pretrained(
+        self.bert = AutoModel.from_pretrained(
             args.model_name,
             return_dict=True)
             
