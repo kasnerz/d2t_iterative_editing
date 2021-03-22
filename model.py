@@ -154,7 +154,7 @@ class LTDataModule(pl.LightningDataModule):
             elems = [x[key] for x in batch]
             elems_pad = pad_sequence(elems, batch_first=True, padding_value=0)
             batch_collated[key] = elems_pad
-        
+
         return batch_collated
 
     def train_dataloader(self):
@@ -177,7 +177,7 @@ class LTDataModule(pl.LightningDataModule):
 
     def _convert_to_features(self, example_batch, indices=None):
         tokens_batch = [sent.split() for sent in example_batch["text"]]
-        
+
         # encode the pre-tokenized text
         features = self.tokenizer.batch_encode_plus(
             tokens_batch,
@@ -206,7 +206,7 @@ class LTDataModule(pl.LightningDataModule):
                                         max_input_examples, exp_output_dir,
                                         experiment_name, enable_swap_tag):
         flags = FLAGS()
-        
+
         flags.input_file = os.path.join(dataset_dir, "train")
         flags.input_format = "fuse"
         flags.vocabulary_size = vocab_size
@@ -256,7 +256,7 @@ class LTDataModule(pl.LightningDataModule):
 
                 if max_input_examples is not None and i > max_input_examples:
                     break
-        
+
         with open(output_file, 'wb') as f_out:
             pickle.dump(examples, f_out, protocol=4)
 
@@ -285,17 +285,18 @@ class LTDataModule(pl.LightningDataModule):
         return labels
 
 
-
-
 class TransformerDecoderLayer(nn.Module):
     """
     https://pytorch.org/docs/stable/_modules/torch/nn/modules/transformer.html#TransformerDecoderLayer
     """
-    def __init__(self, d_model=768, nhead=4, dim_feedforward=3072, dropout=0.1):
+    def __init__(self,
+                 d_model=768,
+                 nhead=4,
+                 dim_feedforward=3072,
+                 dropout=0.1):
         super(TransformerDecoderLayer, self).__init__()
         self.self_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout)
-        # self.multihead_attn = MultiheadAttention(d_model, nhead, dropout=dropout)
-        # Implementation of Feedforward model
+
         self.linear1 = nn.Linear(d_model, dim_feedforward)
         self.dropout = nn.Dropout(dropout)
         self.linear2 = nn.Linear(dim_feedforward, d_model)
@@ -309,9 +310,17 @@ class TransformerDecoderLayer(nn.Module):
 
         self.activation = F.gelu
 
-    def forward(self, tgt, memory, tgt_mask = None, memory_mask = None,
-                tgt_key_padding_mask = None, memory_key_padding_mask = None):
-        tgt2 = self.self_attn(tgt, tgt, tgt, attn_mask=tgt_mask,
+    def forward(self,
+                tgt,
+                memory,
+                tgt_mask=None,
+                memory_mask=None,
+                tgt_key_padding_mask=None,
+                memory_key_padding_mask=None):
+        tgt2 = self.self_attn(tgt,
+                              tgt,
+                              tgt,
+                              attn_mask=tgt_mask,
                               key_padding_mask=tgt_key_padding_mask)[0]
         tgt = tgt + self.dropout1(tgt2)
         tgt = self.norm1(tgt)
@@ -324,44 +333,49 @@ class TransformerDecoderLayer(nn.Module):
         return tgt
 
 
-
 class LaserTagger(pl.LightningModule):
     def __init__(self, args):
         super().__init__()
         self.args = args
         self.save_hyperparameters()
-        
-        self.hidden_size = 768
-        self.num_labels=self.args.vocab_size * 2 + 2  # KEEP / DELETE for each token + standalone
-        
-        if self.args.enable_swap_tag:
-            self.num_labels+=1
 
-        self.bert = AutoModel.from_pretrained(
-            args.model_name,
-            return_dict=True)
-            
-        decoder_layer = TransformerDecoderLayer(d_model=self.hidden_size, nhead=4, dim_feedforward=3072, dropout=0.1)
+        self.hidden_size = 768
+        # KEEP / DELETE for each token + standalone
+        self.num_labels = self.args.vocab_size * 2 + 2
+
+        if self.args.enable_swap_tag:
+            self.num_labels += 1
+
+        self.bert = AutoModel.from_pretrained(args.model_name,
+                                              return_dict=True)
+
+        decoder_layer = TransformerDecoderLayer(d_model=self.hidden_size,
+                                                nhead=4,
+                                                dim_feedforward=3072,
+                                                dropout=0.1)
         decoder_norm = nn.LayerNorm(self.hidden_size)
-        self.transformer_decoder = nn.TransformerDecoder(decoder_layer, num_layers=1, norm=decoder_norm)
+        self.transformer_decoder = nn.TransformerDecoder(decoder_layer,
+                                                         num_layers=1,
+                                                         norm=decoder_norm)
         self.classifier = nn.Linear(self.hidden_size, self.num_labels)
         self.loss_fn = nn.CrossEntropyLoss()
-
 
     def forward(self, **inputs):
         encoder_output = self.bert(
             input_ids=inputs["input_ids"],
             token_type_ids=inputs["token_type_ids"],
-            attention_mask=inputs["attention_mask"]
-        )["last_hidden_state"]
+            attention_mask=inputs["attention_mask"])["last_hidden_state"]
 
-        encoder_output = encoder_output.permute(1,0,2)
+        encoder_output = encoder_output.permute(1, 0, 2)
         decoder_input = encoder_output
 
         mask = self.generate_square_subsequent_mask(encoder_output.size(0))
 
-        decoder_output = self.transformer_decoder(tgt=decoder_input, memory=encoder_output, tgt_mask=mask, memory_mask=mask)
-        decoder_output = decoder_output.permute(1,0,2)
+        decoder_output = self.transformer_decoder(tgt=decoder_input,
+                                                  memory=encoder_output,
+                                                  tgt_mask=mask,
+                                                  memory_mask=mask)
+        decoder_output = decoder_output.permute(1, 0, 2)
 
         logits = self.classifier(decoder_output)
         attention_mask = inputs["attention_mask"]
@@ -373,27 +387,23 @@ class LaserTagger(pl.LightningModule):
                 active_loss = attention_mask.view(-1) == 1
                 active_logits = logits.view(-1, self.num_labels)
                 active_labels = torch.where(
-                    active_loss, labels.view(-1), torch.tensor(self.loss_fn.ignore_index).type_as(labels)
-                )
+                    active_loss, labels.view(-1),
+                    torch.tensor(self.loss_fn.ignore_index).type_as(labels))
                 loss = self.loss_fn(active_logits, active_labels)
             else:
-                loss = self.loss_fn(logits.view(-1, self.num_labels), labels.view(-1))
+                loss = self.loss_fn(logits.view(-1, self.num_labels),
+                                    labels.view(-1))
         else:
             loss = None
 
-        return {
-            "loss" : loss,
-            "logits" : logits
-        }
-
-
+        return {"loss": loss, "logits": logits}
 
     def training_step(self, batch, batch_idx):
         labels = batch["labels"]
         input_ids = batch["input_ids"]
         attention_mask = batch["attention_mask"]
         token_type_ids = batch["token_type_ids"]
-        
+
         outputs = self(input_ids=input_ids,
                        token_type_ids=token_type_ids,
                        attention_mask=attention_mask,
@@ -404,20 +414,19 @@ class LaserTagger(pl.LightningModule):
 
         return loss
 
-
     def validation_step(self, batch, batch_idx):
         labels = batch["labels"]
         input_ids = batch["input_ids"]
         attention_mask = batch["attention_mask"]
         token_type_ids = batch["token_type_ids"]
-        
+
         outputs = self(input_ids=input_ids,
                        token_type_ids=token_type_ids,
                        attention_mask=attention_mask,
                        labels=labels)
 
         loss = outputs["loss"]
-        
+
         self.log('loss/val', loss, prog_bar=True)
         return loss
 
@@ -426,15 +435,16 @@ class LaserTagger(pl.LightningModule):
                           lr=self.args.learning_rate,
                           eps=self.args.adam_epsilon,
                           betas=(self.args.adam_beta1, self.args.adam_beta2))
-        
-        total_steps = self.args.max_steps if self.args.max_steps else len(self.train_dataloader()) * self.args.max_epochs
+
+        total_steps = self.args.max_steps if self.args.max_steps else len(
+            self.train_dataloader()) * self.args.max_epochs
         warmup_steps = total_steps * self.args.warmup_proportion
-    
+
         scheduler = get_linear_schedule_with_warmup(
             optimizer,
             num_warmup_steps=warmup_steps,
             num_training_steps=total_steps)
-        
+
         logger.info(f"Learning rate: {self.args.learning_rate}")
         logger.info(f"Total steps: {total_steps}")
         logger.info(f"Warmup steps: {warmup_steps}")
@@ -459,19 +469,17 @@ class LaserTagger(pl.LightningModule):
 
         return parser
 
-    def generate_square_subsequent_mask(self, sz) :
-        r"""Generate a square mask for the sequence. The masked positions are filled with float('-inf').
-            Unmasked positions are filled with float(0.0).
-        """
-        mask = (torch.triu(torch.ones(sz, sz, device=self.device)) == 1).transpose(0, 1)
-        mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
+    def generate_square_subsequent_mask(self, sz):
+        mask = (torch.triu(torch.ones(sz, sz,
+                                      device=self.device)) == 1).transpose(
+                                          0, 1)
+        mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(
+            mask == 1, float(0.0))
         return mask
-
 
 
 class LTFuseModel(FuseModel):
     def __init__(self, args, model_path, model_name):
-
         exp_output_dir = os.path.join(args.exp_dir, args.experiment,
                                       str(args.vocab_size))
         label_map_file = os.path.join(exp_output_dir, "label_map.txt")
@@ -480,9 +488,7 @@ class LTFuseModel(FuseModel):
         self._id_2_tag = {tag_id: tag for tag, tag_id in label_map.items()}
 
         model_path = os.path.join(model_path, "model.ckpt")
-        self.model = LaserTagger.load_from_checkpoint(
-            model_path            
-        )
+        self.model = LaserTagger.load_from_checkpoint(model_path)
         logger.info(f"Loaded model from {model_path}")
         self.tokenizer = AutoTokenizer.from_pretrained(model_name,
                                                        use_fast=True)
@@ -491,11 +497,14 @@ class LTFuseModel(FuseModel):
         batch_size, seq_length, vocab_size = logits.shape
         log_prob, indices = logits[:, 0, :].topk(k, sorted=True)
         indices = indices.unsqueeze(-1)
-        
+
         for i in range(1, seq_length):
-            log_prob = log_prob.unsqueeze(-1) + logits[:, i, :].unsqueeze(1).repeat(1, k, 1)
-            log_prob, index = log_prob.view(batch_size, -1).topk(k, sorted=True)
-            indices = torch.cat([indices, index.unsqueeze(-1) % vocab_size], dim=-1)
+            log_prob = log_prob.unsqueeze(-1) + logits[:, i, :].unsqueeze(
+                1).repeat(1, k, 1)
+            log_prob, index = log_prob.view(batch_size, -1).topk(k,
+                                                                 sorted=True)
+            indices = torch.cat(
+                [indices, index.unsqueeze(-1) % vocab_size], dim=-1)
 
         return indices
 
@@ -506,8 +515,8 @@ class LTFuseModel(FuseModel):
                                             return_offsets_mapping=True,
                                             add_special_tokens=True)
         logits = self.model(input_ids=inputs["input_ids"],
-                     token_type_ids=inputs["token_type_ids"],
-                     attention_mask=inputs["attention_mask"])["logits"]
+                            token_type_ids=inputs["token_type_ids"],
+                            attention_mask=inputs["attention_mask"])["logits"]
         task = tagging.EditingTask([sentence])
 
         if beam_size > 1:
@@ -515,7 +524,7 @@ class LTFuseModel(FuseModel):
             predictions = predictions[0].detach().numpy()
         else:
             predictions = np.argmax(logits.detach().numpy(), axis=2)
-        
+
         outputs = []
         for labels in predictions:
             offset_mapping = inputs["offset_mapping"][0]
@@ -524,7 +533,8 @@ class LTFuseModel(FuseModel):
                 if self._is_at_word_boundary(sentence, offset)
             ]
             tags_for_tokens = [
-                tagging.Tag(self._id_2_tag[label]) for label in labels_for_tokens
+                tagging.Tag(self._id_2_tag[label])
+                for label in labels_for_tokens
             ]
             try:
                 out = task.realize_output(tags_for_tokens)
@@ -534,7 +544,6 @@ class LTFuseModel(FuseModel):
             outputs.append(out)
 
         return outputs
-
 
     def _is_at_word_boundary(self, sentence, offset):
         # first token (which is not a special token) or a token for which previous character is a space
