@@ -32,7 +32,7 @@ This branch contains the code for replicating the experiments described in the p
 
 <p align="center"> <img src="img/pl-logo.png" width=40px/> </p>
 
-If you wish to extend this implementation, you may be interested in the version implemented in **PyTorch Lightning**, which is being developed in the **[torch](https://github.com/kasnerz/d2t_iterative_editing/tree/torch)** branch.
+If you wish to extend this implementation, you may be interested in the version implemented in **PyTorch Lightning**, which is in the **[torch](https://github.com/kasnerz/d2t_iterative_editing/tree/torch)** branch.
 
 
 
