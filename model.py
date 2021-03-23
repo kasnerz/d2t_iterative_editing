@@ -290,12 +290,14 @@ class TransformerDecoderLayer(nn.Module):
     https://pytorch.org/docs/stable/_modules/torch/nn/modules/transformer.html#TransformerDecoderLayer
     """
     def __init__(self,
-                 d_model=768,
-                 nhead=4,
-                 dim_feedforward=3072,
-                 dropout=0.1):
+                 d_model,
+                 nhead,
+                 dim_feedforward,
+                 dropout):
         super(TransformerDecoderLayer, self).__init__()
         self.self_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout)
+
+        self.proj_layer = nn.Linear(2*d_model, d_model)
 
         self.linear1 = nn.Linear(d_model, dim_feedforward)
         self.dropout = nn.Dropout(dropout)
@@ -317,16 +319,18 @@ class TransformerDecoderLayer(nn.Module):
                 memory_mask=None,
                 tgt_key_padding_mask=None,
                 memory_key_padding_mask=None):
-        tgt2 = self.self_attn(tgt,
-                              tgt,
-                              tgt,
+
+        # directly consuming encoder outputs instead of full multihead attention
+        # follows implementation in https://github.com/google-research/lasertagger/blob/master/transformer_decoder.py
+        tgt = torch.cat([tgt, memory], dim=-1)
+        tgt = self.proj_layer(tgt)
+
+        tgt2 = self.self_attn(tgt, tgt,tgt,
                               attn_mask=tgt_mask,
                               key_padding_mask=tgt_key_padding_mask)[0]
         tgt = tgt + self.dropout1(tgt2)
         tgt = self.norm1(tgt)
-        tgt2 = memory
-        tgt = tgt + self.dropout2(tgt2)
-        tgt = self.norm2(tgt)
+
         tgt2 = self.linear2(self.dropout(self.activation(self.linear1(tgt))))
         tgt = tgt + self.dropout3(tgt2)
         tgt = self.norm3(tgt)
@@ -346,9 +350,8 @@ class LaserTagger(pl.LightningModule):
         if self.args.enable_swap_tag:
             self.num_labels += 1
 
-        self.bert = AutoModel.from_pretrained(args.model_name,
+        self.encoder = AutoModel.from_pretrained(args.model_name,
                                               return_dict=True)
-
         decoder_layer = TransformerDecoderLayer(d_model=self.hidden_size,
                                                 nhead=4,
                                                 dim_feedforward=3072,
@@ -361,20 +364,18 @@ class LaserTagger(pl.LightningModule):
         self.loss_fn = nn.CrossEntropyLoss()
 
     def forward(self, **inputs):
-        encoder_output = self.bert(
+        encoder_output = self.encoder(
             input_ids=inputs["input_ids"],
             token_type_ids=inputs["token_type_ids"],
             attention_mask=inputs["attention_mask"])["last_hidden_state"]
 
+        embedding_layer = self.encoder.embeddings
+        decoder_input = embedding_layer(inputs["input_ids"]).permute(1, 0, 2)
         encoder_output = encoder_output.permute(1, 0, 2)
-        decoder_input = encoder_output
 
         mask = self.generate_square_subsequent_mask(encoder_output.size(0))
-
         decoder_output = self.transformer_decoder(tgt=decoder_input,
-                                                  memory=encoder_output,
-                                                  tgt_mask=mask,
-                                                  memory_mask=mask)
+                                                  memory=encoder_output)
         decoder_output = decoder_output.permute(1, 0, 2)
 
         logits = self.classifier(decoder_output)
@@ -411,7 +412,6 @@ class LaserTagger(pl.LightningModule):
 
         loss = outputs["loss"]
         self.log('loss/train', loss, prog_bar=True)
-
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -431,7 +431,7 @@ class LaserTagger(pl.LightningModule):
         return loss
 
     def configure_optimizers(self):
-        optimizer = AdamW(self.bert.parameters(),
+        optimizer = AdamW(self.encoder.parameters(),
                           lr=self.args.learning_rate,
                           eps=self.args.adam_epsilon,
                           betas=(self.args.adam_beta1, self.args.adam_beta2))
@@ -487,7 +487,7 @@ class LTFuseModel(FuseModel):
 
         self._id_2_tag = {tag_id: tag for tag, tag_id in label_map.items()}
 
-        model_path = os.path.join(model_path, "model.ckpt")
+        model_path = os.path.join(model_path, "last.ckpt")
         self.model = LaserTagger.load_from_checkpoint(model_path)
         logger.info(f"Loaded model from {model_path}")
         self.tokenizer = AutoTokenizer.from_pretrained(model_name,

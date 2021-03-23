@@ -69,7 +69,8 @@ if __name__ == '__main__':
         checkpoint_callback = pl.callbacks.ModelCheckpoint(
             dirpath=ckpt_output_dir,
             filename='model',
-            save_top_k=1,
+            save_top_k=0,
+            save_last=True,
             verbose=True,
             monitor='loss/val',
             mode='min'

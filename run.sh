@@ -1,6 +1,5 @@
 #!/bin/bash
 
-
 WEBNLG_PATH="./datasets/webnlg/data/v1.4/en/"
 E2E_PATH="./datasets/e2e-cleaning/cleaned-data"
 DF_PATH="./datasets/discofuse/discofuse_v1/wikipedia"
@@ -44,6 +43,9 @@ MODE=full
 # size of the LaserTagger vocabulary
 VOCAB_SIZE=100
 
+# number of GPUs used for finetuning the model
+GPUS=1
+
 # device for the LMScorer: cpu / gpu
 # note that an extra GPU is needed in case the sentence fusion model also runs on GPU (which is recommended)
 # if mode=full, preprocessing does not use LMScorer and thus the parameter LMS_DEVICE_PREPROCESSING is unused
@@ -53,8 +55,8 @@ LMS_DEVICE_DECODING=cpu
 # experiment name (used for naming the experiment directory), e.g. webnlg_full
 EXPERIMENT_NAME="${1,,}_${MODE}"
 
-# number of LT finetuning steps
-NUM_TRAIN_STEPS=10000
+# number of LT finetuning epochs
+NUM_EPOCHS=3
 
 # which data split to decode and evaluate (dev / test)
 DECODE_AND_EVAL_SPLIT=test
@@ -82,7 +84,8 @@ python3 train.py \
     --mode "$MODE" \
     --vocab_size "$VOCAB_SIZE" \
     --experiment "$EXPERIMENT_NAME" \
-    --num_train_steps "$NUM_TRAIN_STEPS"
+    --max_epochs "$NUM_EPOCHS" \
+    --gpu "$GPUS"
 
 python3 decode.py \
     --dataset "$DATASET_EVAL" \
@@ -95,5 +98,5 @@ python3 decode.py \
 
 python3 evaluate.py \
     --ref_file "data/${DATASET_EVAL,,}/ref/$DECODE_AND_EVAL_SPLIT.ref" \
-    --hyp_file "out/${EXPERIMENT_NAME}_${VOCAB_SIZE}_${DECODE_AND_EVAL_SPLIT}.hyp" \
+    --hyp_file "experiments/${EXPERIMENT_NAME}/${VOCAB_SIZE}/${DECODE_AND_EVAL_SPLIT}.hyp" \
     --lowercase

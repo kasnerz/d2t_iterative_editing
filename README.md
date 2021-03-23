@@ -9,7 +9,7 @@ A description of the method can be found in:
 ## Implementation Notes
 This is an **alternative implementation** of the method based on **pyTorch Lightning**. It contains fragments from the original implementation of LaserTagger (e.g. the code for computing the vocabulary), but it does **not require** Tensorflow.
 
-The implementation is meant to be more flexible, allowing to use the full potential of the [🤗 Transformers](https://huggingface.co/transformers) library.
+The implementation should allow to use the full potential of the [Transformers](https://huggingface.co/transformers) library (e.g. quickly trying out various architectures). However, it is not tested thoroughly; use at your own risk.
 
 <p align="center">
   <img src="lightning.png" width=500px />
@@ -42,7 +42,7 @@ pip install -r requirements.txt
 - packages
   - torch 1.7.1
   - pytorch-lightning 1.0.7
-  - 🤗 Transformers
+  - transformers 3.5.1
   - see `requirements.txt` for the full list
 
 All packages can be installed using
@@ -116,7 +116,7 @@ python3 train.py \
     --mode "full" \
     --experiment "webnlg_full" \
     --vocab_size 100 \
-    --num_train_steps 10000
+    --max_steps 10000
 ```
 
 Things you may want to consider:
