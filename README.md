@@ -7,7 +7,7 @@ A description of the method can be found in:
  > Zdeněk Kasner & Ondřej Dušek (2020): [Data-to-Text Generation with Iterative Text Editing.](https://www.aclweb.org/anthology/2020.inlg-1.9/) In: *Proceedings of the 13th International Conference on Natural Language Generation (INLG 2020)*.
 
 ## Model Overview
-![overview](model.png)
+![overview](img/model.png)
 
 ## Quickstart
 
@@ -25,12 +25,12 @@ pip install -r requirements.txt
 ```
 
 ## Implementation notes
-<p align="center"> <img src="tf1-logo.png" width=40px/> </p>
+<p align="center"> <img src="img/tf1-logo.png" width=40px/> </p>
 
 This branch contains the code for replicating the experiments described in the paper. The code works with the original implementation of LaserTagger and BERT in **Tensorflow 1.15**. However, the implementation is now somehow obsolete and less flexible.
 
 
-<p align="center"> <img src="pl-logo.png" width=40px/> </p>
+<p align="center"> <img src="img/pl-logo.png" width=40px/> </p>
 
 If you wish to extend this implementation, you may be interested in the version implemented in **PyTorch Lightning**, which is being developed in the **[torch](https://github.com/kasnerz/d2t_iterative_editing/tree/torch)** branch.
 
